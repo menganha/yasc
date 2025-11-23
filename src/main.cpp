@@ -1,4 +1,5 @@
 #include "arena.hpp"
+#include "array.hpp"
 #include "control.hpp"
 #include "file_io.hpp"
 #include "game.hpp"
@@ -45,20 +46,14 @@ int main([[maybe_unused]] int argc, char* argv[])
     int version = gladLoadGL((GLADloadfunc)SDL_GL_GetProcAddress);
     LDEBUG("Loaded GL %d.%d\n", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
 
-    const int num_instances = 6;
+    Arena arena {MEGABYTES(4)};
+
+    Array<Vec4> pos_tex {};
     // Set the quad for the sprite
-    GLuint    InstanceVBO, VBO, VAO;
+    GLuint InstanceVBO, VBO, VAO;
     {
 
-        // Position in pixels and texels
-        Vec4 pos_tex[num_instances] {
-          {       0.f,   0.f,       128.f, 64.f},
-          {      16.f,   0.f,         0.f,  0.f},
-          {     100.f, 100.f,        16.f, 32.f},
-          {     100.f,   0.f, 48.f + 32.f,  0.f},
-          {    100.1f,  16.f, 48.f + 32.f,  0.f},
-          {99.999999f,  32.f, 48.f + 32.f,  0.f}
-        };
+        loadLevel(pos_tex, arena);
 
         // Generate buffers
         glGenBuffers(1, &VBO);
@@ -67,7 +62,7 @@ int main([[maybe_unused]] int argc, char* argv[])
 
         glGenBuffers(1, &InstanceVBO);
         glBindBuffer(GL_ARRAY_BUFFER, InstanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * num_instances, &pos_tex[0], GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * pos_tex.length, &pos_tex[0], GL_STATIC_DRAW);
 
         // Generate Vertex array
         glGenVertexArrays(1, &VAO);
@@ -122,7 +117,6 @@ int main([[maybe_unused]] int argc, char* argv[])
         glBindVertexArray(0);
     }
 
-    Arena  arena {MEGABYTES(4)};
     Shader shader;
     {
 
@@ -239,7 +233,7 @@ int main([[maybe_unused]] int argc, char* argv[])
         // Fixed geometry
         glUniformMatrix4fv(mat_model, 1, GL_TRUE, &MODEL_MAT_ID[0][0]);
         glBindVertexArray(VAO);
-        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, num_instances);
+        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, pos_tex.length);
 
         // Non fixed geometry
         glUniformMatrix4fv(mat_model, 1, GL_TRUE, &model_mat_player[0][0]);

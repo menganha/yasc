@@ -1,16 +1,6 @@
 #pragma once
-
-// const int MAX_TILES_HORIZ = 30;
-// const int MAX_TILES_VERT = 20;
-//
-// struct Level
-// {
-//     int tiles[MAX_TILES_HORIZ][MAX_TILES_VERT];
-// };
-//
-// Level getLevel(int level_idx);
-
-// struct __xy { float x, y;};
+#include "arena.hpp"
+#include "array.hpp"
 
 struct Vec2
 {
@@ -30,12 +20,6 @@ struct Vec4
 const IVec2 RES_SUPER_NINTENDO {256, 224};
 const IVec2 RES_SUPER_NINTENDO_DOUBLE {512, 488}; // less used
 
-struct Entity
-{
-    Vec2  position;
-    IVec2 texture_atlas_offset;
-};
-
 const float TILE_SIZE = 16.f;
 const float PIXEL_ADJ = 0.1f; // Needed for the correct texel interpolation
 const Vec4  QUAD[8] = {
@@ -52,3 +36,12 @@ const float MODEL_MAT_ID[4][4] {
   {0.f, 0.f, 1.f, 0.f},
   {0.f, 0.f, 0.f, 1.f}
 };
+
+struct Entity
+{
+    Vec2  position;
+    IVec2 texture_atlas_offset;
+};
+
+void loadLevel(Array<Vec4>& , Arena&);
+

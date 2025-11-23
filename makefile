@@ -6,7 +6,7 @@ MAKEFLAGS += --no-builtin-variables
 # The only part the must be modified by the user
 #
 EXECUTABLE := game
-SRCS_APP := src/main.cpp src/log.cpp src/shaders.cpp src/file_io.cpp src/arena.cpp src/control.cpp libs/stb/stb_image.c libs/glad/gl.c
+SRCS_APP := src/main.cpp src/log.cpp src/shaders.cpp src/file_io.cpp src/arena.cpp src/control.cpp src/game.cpp libs/stb/stb_image.c libs/glad/gl.c
 
 # LIB := meshlib.a
 # SRCS_LIB := src/log.cpp src/mesh.cpp src/camera.cpp src/arena.cpp src/shaders.cpp libs/glad/src/glad.c
