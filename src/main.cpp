@@ -14,7 +14,6 @@ const char*      TITLE = "Unnamed title";
 const IVec2      RESOLUTION = RES_SUPER_NINTENDO;
 const int        RES_SCALING = 4;
 const IVec2      WINDOW_SIZE {RESOLUTION.x * RES_SCALING, RESOLUTION.y* RES_SCALING};
-const float      TILE_SIZE = 16.f;
 
 int main([[maybe_unused]] int argc, char* argv[])
 {
@@ -50,14 +49,6 @@ int main([[maybe_unused]] int argc, char* argv[])
     // Set the quad for the sprite
     GLuint    InstanceVBO, VBO, VAO;
     {
-        // Quad Definition
-        float pixel_adjusment = 0.1f;  // Needed for the correct texel interpolation
-        Vec4  vertices_texture_coordinates[4] = {
-          {      0.f,       0.f,       0.f + pixel_adjusment,       0.f + pixel_adjusment},
-          {TILE_SIZE,      0.0f, TILE_SIZE - pixel_adjusment,       0.f + pixel_adjusment},
-          {TILE_SIZE, TILE_SIZE, TILE_SIZE - pixel_adjusment, TILE_SIZE - pixel_adjusment},
-          {     0.0f, TILE_SIZE,       0.f + pixel_adjusment, TILE_SIZE - pixel_adjusment}
-        };
 
         // Position in pixels and texels
         Vec4 pos_tex[num_instances] {
@@ -72,13 +63,11 @@ int main([[maybe_unused]] int argc, char* argv[])
         // Generate buffers
         glGenBuffers(1, &VBO);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * 4, &vertices_texture_coordinates[0], GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * 4, &QUAD[0], GL_STATIC_DRAW);
 
         glGenBuffers(1, &InstanceVBO);
         glBindBuffer(GL_ARRAY_BUFFER, InstanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * num_instances, &pos_tex[0], GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * num_instances, &pos_tex[0], GL_STATIC_DRAW);
 
         // Generate Vertex array
         glGenVertexArrays(1, &VAO);
@@ -93,11 +82,40 @@ int main([[maybe_unused]] int argc, char* argv[])
         glBindBuffer(GL_ARRAY_BUFFER, InstanceVBO);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-        // glEnableVertexAttribArray(2);
-        // glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-
         glVertexAttribDivisor(1, 1);
-        // glVertexAttribDivisor(2, 1);
+
+        // unbind VBO and VAOS
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+
+    GLuint VBO_player, VBO_player_offset, VAO_player;
+    {
+
+        // Generate buffers
+        glGenBuffers(1, &VBO_player);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO_player);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * 4, &QUAD[0], GL_STATIC_DRAW);
+
+        Vec4 quad_offset {0.f, 0.f, 128.f, 0.f};
+        glGenBuffers(1, &VBO_player_offset);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO_player_offset);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4), &quad_offset, GL_STATIC_DRAW);
+
+        // Generate Vertex array
+        glGenVertexArrays(1, &VAO_player);
+        glBindVertexArray(VAO_player);
+
+        // attributes of the VBO
+        glBindBuffer(GL_ARRAY_BUFFER, VBO_player);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+        // attributes of the InstanceVBO
+        glBindBuffer(GL_ARRAY_BUFFER, VBO_player_offset);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+        glVertexAttribDivisor(1, 1);
 
         // unbind VBO and VAOS
         glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -137,7 +155,7 @@ int main([[maybe_unused]] int argc, char* argv[])
         GLint sprite_loc = glGetUniformLocation(shader.program_id, "sprite");
         glUniform1i(sprite_loc, 0);
 
-        // upload the uniform for transforming the texel vertices
+        // upload the uniform for scaling the texel vertices
         float texture_scaling[2][2] {};
         texture_scaling[0][0] = 1.f / width;
         texture_scaling[1][1] = 1.f / height;
@@ -148,8 +166,8 @@ int main([[maybe_unused]] int argc, char* argv[])
 
     {
         float proje_mat[4][4] {};
-        proje_mat[0][0] = 2.f / WINDOW_SIZE.x;
-        proje_mat[1][1] = -2.f / WINDOW_SIZE.y;
+        proje_mat[0][0] = 2.f / RESOLUTION.x;
+        proje_mat[1][1] = -2.f / RESOLUTION.y;
         proje_mat[2][2] = -1.f;
         proje_mat[3][3] = 1.f;
 
@@ -161,11 +179,12 @@ int main([[maybe_unused]] int argc, char* argv[])
         glUniformMatrix4fv(mat_loc_proj, 1, GL_TRUE, &proje_mat[0][0]);
     }
 
-    float model_mat[4][4] {};
-    model_mat[0][0] = (float)WINDOW_SIZE.x / (float)RESOLUTION.x; // we scale here
-    model_mat[1][1] = (float)WINDOW_SIZE.y / (float)RESOLUTION.y;
-    model_mat[2][2] = 1.f;
-    model_mat[3][3] = 1.f;
+    float model_mat_player[4][4] {
+      {1.f, 0.f, 0.f, 32.f},
+      {0.f, 1.f, 0.f, 32.f},
+      {0.f, 0.f, 1.f,  0.f},
+      {0.f, 0.f, 0.f,  1.f}
+    };
 
     Keyboard keyboard {};
 
@@ -188,19 +207,19 @@ int main([[maybe_unused]] int argc, char* argv[])
         ctrlUpdate(keyboard);
         if ( ctrlIsDown(keyboard, BUTTON_RIGHT) )
         {
-            model_mat[0][3] += 1.f;
+            model_mat_player[0][3] += 1.f;
         }
         if ( ctrlIsDown(keyboard, BUTTON_LEFT) )
         {
-            model_mat[0][3] -= 1.f;
+            model_mat_player[0][3] -= 1.f;
         }
         if ( ctrlIsDown(keyboard, BUTTON_UP) )
         {
-            model_mat[1][3] -= 1.f;
+            model_mat_player[1][3] -= 1.f;
         }
         if ( ctrlIsDown(keyboard, BUTTON_DOWN) )
         {
-            model_mat[1][3] += 1.f;
+            model_mat_player[1][3] += 1.f;
         }
 
         glClearColor(0.7f, 0.7f, 0.5f, 1.0f);
@@ -215,12 +234,17 @@ int main([[maybe_unused]] int argc, char* argv[])
         glBindTexture(GL_TEXTURE_2D, TEXTURE_ID);
 
         glUseProgram(shader.program_id);
+        GLint mat_model = glGetUniformLocation(shader.program_id, "model");
 
-        GLint mat_loc_model = glGetUniformLocation(shader.program_id, "model");
-        glUniformMatrix4fv(mat_loc_model, 1, GL_TRUE, &model_mat[0][0]);
-
+        // Fixed geometry
+        glUniformMatrix4fv(mat_model, 1, GL_TRUE, &MODEL_MAT_ID[0][0]);
         glBindVertexArray(VAO);
         glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, num_instances);
+
+        // Non fixed geometry
+        glUniformMatrix4fv(mat_model, 1, GL_TRUE, &model_mat_player[0][0]);
+        glBindVertexArray(VAO_player);
+        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, 1);
 
         SDL_GL_SwapWindow(window);
     }
