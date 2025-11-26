@@ -23,5 +23,5 @@ struct Keyboard
 
 void ctrlUpdate(Keyboard& keyboard);
 bool ctrlIsDown(const Keyboard& keyboard, Button button);
-bool ctrlIsReleased(const Keyboard& keyboard);
-bool ctrlIsPresed(const Keyboard& keyboard);
+bool ctrlIsReleased(const Keyboard& keyboard, Button button);
+bool ctrlIsPressed(const Keyboard& keyboard, Button button);

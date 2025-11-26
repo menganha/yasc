@@ -13,16 +13,20 @@
 
 class Arena
 {
-    unsigned char* m_buffer;
-    int            m_offset;
-    int            m_size;
-
   public:
     Arena(int buffer_size);
     ~Arena();
     void reset();
     template<typename T>
-    T* allocate(int number = 1);
+    T*   allocate(int number = 1);
+    void set_mark();      //  sets temporary mark to start making temporary allocation
+    void reset_to_mark(); // reset to last mark
+
+  private:
+    unsigned char* m_buffer;
+    int            m_offset;
+    int            m_size;
+    int            m_mark = -1;
 };
 
 template<typename T>

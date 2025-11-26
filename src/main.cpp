@@ -1,5 +1,4 @@
 #include "arena.hpp"
-#include "array.hpp"
 #include "control.hpp"
 #include "file_io.hpp"
 #include "game.hpp"
@@ -7,6 +6,7 @@
 #include "shaders.hpp"
 
 #include <SDL2/SDL.h>
+#include <cmath>
 #include <glad/gl.h>
 #include <stb/stb_image.h>
 
@@ -44,78 +44,14 @@ int main([[maybe_unused]] int argc, char* argv[])
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
     int version = gladLoadGL((GLADloadfunc)SDL_GL_GetProcAddress);
-    LDEBUG("Loaded GL %d.%d\n", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
+    LDEBUG("Loaded GL %d.%d", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
 
-    Arena arena {MEGABYTES(4)};
+    Arena arena {MEGABYTES(1)};
 
-    Array<Vec4> pos_tex {};
-    // Set the quad for the sprite
-    GLuint InstanceVBO, VBO, VAO;
-    {
+    Registry registry {};
 
-        loadLevel(pos_tex, arena);
-
-        // Generate buffers
-        glGenBuffers(1, &VBO);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * 4, &QUAD[0], GL_STATIC_DRAW);
-
-        glGenBuffers(1, &InstanceVBO);
-        glBindBuffer(GL_ARRAY_BUFFER, InstanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * pos_tex.length, &pos_tex[0], GL_STATIC_DRAW);
-
-        // Generate Vertex array
-        glGenVertexArrays(1, &VAO);
-        glBindVertexArray(VAO);
-
-        // attributes of the VBO
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-
-        // attributes of the InstanceVBO
-        glBindBuffer(GL_ARRAY_BUFFER, InstanceVBO);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-        glVertexAttribDivisor(1, 1);
-
-        // unbind VBO and VAOS
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-    }
-
-    GLuint VBO_player, VBO_player_offset, VAO_player;
-    {
-
-        // Generate buffers
-        glGenBuffers(1, &VBO_player);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO_player);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * 4, &QUAD[0], GL_STATIC_DRAW);
-
-        Vec4 quad_offset {0.f, 0.f, 128.f, 0.f};
-        glGenBuffers(1, &VBO_player_offset);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO_player_offset);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4), &quad_offset, GL_STATIC_DRAW);
-
-        // Generate Vertex array
-        glGenVertexArrays(1, &VAO_player);
-        glBindVertexArray(VAO_player);
-
-        // attributes of the VBO
-        glBindBuffer(GL_ARRAY_BUFFER, VBO_player);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-
-        // attributes of the InstanceVBO
-        glBindBuffer(GL_ARRAY_BUFFER, VBO_player_offset);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-        glVertexAttribDivisor(1, 1);
-
-        // unbind VBO and VAOS
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-    }
+    EntityID ent_id_player = LoadLevel(registry);
+    Entity&  ent_player = regGetEntity(registry, ent_id_player);
 
     Shader shader;
     {
@@ -158,6 +94,7 @@ int main([[maybe_unused]] int argc, char* argv[])
         glUniformMatrix2fv(mat_loc_proj, 1, GL_TRUE, &texture_scaling[0][0]);
     }
 
+    // Sets the projection matrix
     {
         float proje_mat[4][4] {};
         proje_mat[0][0] = 2.f / RESOLUTION.x;
@@ -173,14 +110,10 @@ int main([[maybe_unused]] int argc, char* argv[])
         glUniformMatrix4fv(mat_loc_proj, 1, GL_TRUE, &proje_mat[0][0]);
     }
 
-    float model_mat_player[4][4] {
-      {1.f, 0.f, 0.f, 32.f},
-      {0.f, 1.f, 0.f, 32.f},
-      {0.f, 0.f, 1.f,  0.f},
-      {0.f, 0.f, 0.f,  1.f}
-    };
-
     Keyboard keyboard {};
+    Vec2     vel {};
+    int      movement_time_counter = 0;
+    int      movement_time = 8; // in frames
 
     SDL_Event event;
     bool      should_quit {false};
@@ -195,55 +128,122 @@ int main([[maybe_unused]] int argc, char* argv[])
                 break;
             }
         }
-        //////////////////////////
-        /// Controls
-        //////////////////////////
+
+        /// Update Game
+
         ctrlUpdate(keyboard);
-        if ( ctrlIsDown(keyboard, BUTTON_RIGHT) )
+        if ( ctrlIsPressed(keyboard, BUTTON_RIGHT) and not movement_time_counter )
         {
-            model_mat_player[0][3] += 1.f;
+            vel.x = 1.f;
+            vel.y = 0.f;
+            movement_time_counter = movement_time;
         }
-        if ( ctrlIsDown(keyboard, BUTTON_LEFT) )
+        else if ( ctrlIsPressed(keyboard, BUTTON_LEFT) and not movement_time_counter )
         {
-            model_mat_player[0][3] -= 1.f;
+            vel.x = -1.f;
+            vel.y = 0.f;
+            movement_time_counter = movement_time;
         }
-        if ( ctrlIsDown(keyboard, BUTTON_UP) )
+        else if ( ctrlIsPressed(keyboard, BUTTON_UP) and not movement_time_counter )
         {
-            model_mat_player[1][3] -= 1.f;
+            vel.y = -1.f;
+            vel.x = 0.f;
+            movement_time_counter = movement_time;
         }
-        if ( ctrlIsDown(keyboard, BUTTON_DOWN) )
+        else if ( ctrlIsPressed(keyboard, BUTTON_DOWN) and not movement_time_counter )
         {
-            model_mat_player[1][3] += 1.f;
+            vel.y = 1.f;
+            vel.x = 0.f;
+            movement_time_counter = movement_time;
         }
+
+        if ( movement_time_counter )
+        {
+            regMoveEntity(registry, ent_id_player, vel.x * TILE_SIZE / movement_time, vel.y * TILE_SIZE / movement_time);
+            movement_time_counter--;
+
+            if ( movement_time_counter == 0 ) // Finish move
+            {
+                regRepositionEntity(
+                  registry, ent_id_player,
+                  std::round(ent_player.pos_prev.x + vel.x * TILE_SIZE),
+                  std::round(ent_player.pos_prev.y + vel.y * TILE_SIZE));
+
+                if ( EntityID ent_id_coll = HasCollided(registry, ent_id_player) )
+                {
+                    Entity& entity_collided = regGetEntity(registry, ent_id_coll);
+                    if ( entity_collided.movable )
+                    {
+                        regRepositionEntity(
+                          registry, ent_id_coll,
+                          std::round(entity_collided.pos_prev.x + vel.x * TILE_SIZE),
+                          std::round(entity_collided.pos_prev.y + vel.y * TILE_SIZE));
+
+                        if ( EntityID ent_id_coll_coll = HasCollided(registry, ent_id_coll) )
+                        {
+                            Entity& ent_coll_coll = regGetEntity(registry, ent_id_coll_coll);
+                            if ( ent_coll_coll.price ) // We collide a price with a movable block
+                            {
+                                entity_collided.occupied = true;
+                            }
+                        }
+                        else
+                        {
+                            entity_collided.occupied = false;
+                        }
+                    }
+                }
+            }
+            else if ( EntityID ent_id_coll = HasCollided(registry, ent_id_player) ) // Collision
+            {
+                Entity& entity_collided = regGetEntity(registry, ent_id_coll);
+                // If we have collided with a movable box we move it with player, and if in this movement it collides
+                // with a non-price block then we revert the two positions, namely, the player and the movable box
+                if ( entity_collided.movable )
+                {
+                    regMoveEntity(registry, ent_id_coll, vel.x * TILE_SIZE / movement_time, vel.y * TILE_SIZE / movement_time);
+                    if ( EntityID ent_id_coll_coll = HasCollided(registry, ent_id_coll) )
+                    {
+                        if ( not regGetEntity(registry, ent_id_coll_coll).price )
+                        {
+                            regRepositionEntity(registry, ent_id_coll, entity_collided.pos_prev.x, entity_collided.pos_prev.y);
+                            regRepositionEntity(registry, ent_id_player, ent_player.pos_prev.x, ent_player.pos_prev.y);
+                            movement_time_counter = 0;
+                        }
+                    }
+                }
+                // If the collision is not with a movable nor a price, then just revert the position
+                else if ( not entity_collided.price )
+                {
+                    regRepositionEntity(registry, ent_id_player, ent_player.pos_prev.x, ent_player.pos_prev.y);
+                    movement_time_counter = 0;
+                }
+            }
+        }
+
+        ///  Draw
 
         glClearColor(0.7f, 0.7f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        ///////////////////////////
-        /// Draw calls
-        ///////////////////////////
-        // glActiveTexture(GL_TEXTURE0); // Necessary?
         glBindTexture(GL_TEXTURE_2D, TEXTURE_ID);
-
         glUseProgram(shader.program_id);
-        GLint mat_model = glGetUniformLocation(shader.program_id, "model");
 
-        // Fixed geometry
-        glUniformMatrix4fv(mat_model, 1, GL_TRUE, &MODEL_MAT_ID[0][0]);
-        glBindVertexArray(VAO);
-        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, pos_tex.length);
+        for ( auto& ent : registry.entities )
+        {
+            Draw(shader.program_id, ent.renderable);
+        }
 
-        // Non fixed geometry
-        glUniformMatrix4fv(mat_model, 1, GL_TRUE, &model_mat_player[0][0]);
-        glBindVertexArray(VAO_player);
-        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, 1);
+        if ( HasWon(registry) )
+        {
+            LINFO("You have won!");
+        }
 
         SDL_GL_SwapWindow(window);
     }
 
-    // SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_GL_DeleteContext(gl_context);
     SDL_Quit();

@@ -41,9 +41,12 @@ DEPS = $(OBJS_APP:.o=.d)
 # OBJS_LIB = $(SRCS_LIB:%=$(BUILD_DIR)/%.o)
 # DEPS = $(OBJS_LIB:.o=.d)
 
-.PHONY: all clean test
+.PHONY: all run clean test
 
 all: $(BUILD_DIR)/$(EXECUTABLE)
+
+run: $(BUILD_DIR)/$(EXECUTABLE)
+	./$(BUILD_DIR)/$(EXECUTABLE)
 
 $(BUILD_DIR)/$(EXECUTABLE): $(OBJS_APP) #$(BUILD_DIR)/$(LIB)
 	$(CXX) $^ -o $@ $(LDFLAGS) $(SANITIZER)
