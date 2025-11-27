@@ -2,6 +2,7 @@
 #include "control.hpp"
 #include "file_io.hpp"
 #include "game.hpp"
+#include "levels.hpp"
 #include "log.hpp"
 #include "shaders.hpp"
 
@@ -46,13 +47,7 @@ int main([[maybe_unused]] int argc, char* argv[])
     int version = gladLoadGL((GLADloadfunc)SDL_GL_GetProcAddress);
     LDEBUG("Loaded GL %d.%d", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
 
-    Arena arena {MEGABYTES(1)};
-
-    Registry registry {};
-
-    EntityID ent_id_player = LoadLevel(registry);
-    Entity&  ent_player = regGetEntity(registry, ent_id_player);
-
+    Arena  arena {MEGABYTES(1)};
     Shader shader;
     {
 
@@ -110,10 +105,19 @@ int main([[maybe_unused]] int argc, char* argv[])
         glUniformMatrix4fv(mat_loc_proj, 1, GL_TRUE, &proje_mat[0][0]);
     }
 
-    Keyboard keyboard {};
-    Vec2     vel {};
-    int      movement_time_counter = 0;
-    int      movement_time = 8; // in frames
+    Keyboard  keyboard {};
+    Vec2      vel {};
+    int       movement_time_counter {};
+    const int movement_time {8}; // in frames
+    bool      has_won {false};
+    int       current_level {};
+    Registry  registry {};
+    EntityID  ent_id_player = LoadLevel(registry, current_level);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_GREATER);
 
     SDL_Event event;
     bool      should_quit {false};
@@ -126,11 +130,24 @@ int main([[maybe_unused]] int argc, char* argv[])
             case SDL_QUIT:
                 should_quit = true;
                 break;
+            case SDL_KEYDOWN:
+                switch ( event.key.keysym.sym )
+                {
+                case SDLK_F1: // Restart
+                    CleanUp(registry);
+                    ent_id_player = LoadLevel(registry, current_level);
+                    break;
+                case SDLK_F2: // Advance
+                    CleanUp(registry);
+                    current_level++;
+                    ent_id_player = LoadLevel(registry, current_level);
+                    break;
+                }
+                break;
             }
         }
 
         /// Update Game
-
         ctrlUpdate(keyboard);
         if ( ctrlIsPressed(keyboard, BUTTON_RIGHT) and not movement_time_counter )
         {
@@ -159,6 +176,7 @@ int main([[maybe_unused]] int argc, char* argv[])
 
         if ( movement_time_counter )
         {
+            Entity& ent_player = regGetEntity(registry, ent_id_player);
             regMoveEntity(registry, ent_id_player, vel.x * TILE_SIZE / movement_time, vel.y * TILE_SIZE / movement_time);
             movement_time_counter--;
 
@@ -185,6 +203,10 @@ int main([[maybe_unused]] int argc, char* argv[])
                             if ( ent_coll_coll.price ) // We collide a price with a movable block
                             {
                                 entity_collided.occupied = true;
+                                if ( HasWon(registry) )
+                                {
+                                    has_won = true;
+                                }
                             }
                         }
                         else
@@ -223,10 +245,9 @@ int main([[maybe_unused]] int argc, char* argv[])
 
         ///  Draw
 
-        glClearColor(0.7f, 0.7f, 0.5f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+        glClearDepth(0.0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glBindTexture(GL_TEXTURE_2D, TEXTURE_ID);
         glUseProgram(shader.program_id);
@@ -235,13 +256,16 @@ int main([[maybe_unused]] int argc, char* argv[])
         {
             Draw(shader.program_id, ent.renderable);
         }
+        SDL_GL_SwapWindow(window);
 
-        if ( HasWon(registry) )
+        if ( has_won )
         {
             LINFO("You have won!");
+            CleanUp(registry);
+            current_level++;
+            has_won = false;
+            ent_id_player = LoadLevel(registry, current_level);
         }
-
-        SDL_GL_SwapWindow(window);
     }
 
     SDL_DestroyWindow(window);
