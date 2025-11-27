@@ -5,5 +5,5 @@
 [ ] sound
 [ ] animation
 [ ] support to read from file and hot reload levels for improved design
-[ ] control support
+[X] control support
 [ ] raspberry pi support

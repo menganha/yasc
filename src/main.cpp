@@ -20,7 +20,7 @@ const IVec2      WINDOW_SIZE {RESOLUTION.x * RES_SCALING, RESOLUTION.y* RES_SCAL
 int main([[maybe_unused]] int argc, char* argv[])
 {
 
-    if ( SDL_Init(SDL_INIT_VIDEO) < 0 )
+    if ( SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0 )
     {
         LERROR("SDL error when initializing: %s", SDL_GetError());
         return 1;
@@ -105,14 +105,15 @@ int main([[maybe_unused]] int argc, char* argv[])
         glUniformMatrix4fv(mat_loc_proj, 1, GL_TRUE, &proje_mat[0][0]);
     }
 
-    Keyboard  keyboard {};
-    Vec2      vel {};
-    int       movement_time_counter {};
-    const int movement_time {8}; // in frames
-    bool      has_won {false};
-    int       current_level {};
-    Registry  registry {};
-    EntityID  ent_id_player = LoadLevel(registry, current_level);
+    GamepadState        keyboard {};
+    Vec2                vel {};
+    int                 movement_time_counter {};
+    const int           movement_time {8}; // in frames
+    bool                has_won {false};
+    int                 current_level {};
+    Registry            registry {};
+    EntityID            ent_id_player = LoadLevel(registry, current_level);
+    SDL_GameController* controller = ctrlFindController();
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -144,11 +145,37 @@ int main([[maybe_unused]] int argc, char* argv[])
                     break;
                 }
                 break;
+            case SDL_CONTROLLERDEVICEADDED:
+                if ( !controller )
+                {
+                    LINFO("A new controller was connected with id %i", event.cdevice.which);
+                    controller = SDL_GameControllerOpen(event.cdevice.which);
+                }
+                break;
+            case SDL_CONTROLLERDEVICEREMOVED:
+                LINFO("Controller was disconnected with id %i", event.cdevice.which);
+                if ( controller && event.cdevice.which == SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller)) )
+                {
+                    SDL_GameControllerClose(controller);
+                    controller = ctrlFindController();
+                }
+                break;
             }
         }
 
         /// Update Game
-        ctrlUpdate(keyboard);
+        if ( controller )
+        {
+            ctrlUpdate(keyboard, controller);
+        }
+        else
+        {
+            ctrlUpdate(keyboard);
+        }
+
+        if ( ctrlIsPressed(keyboard, BUTTON_SELECT) )
+            LINFO("SELECT BUTTON PRESSED");
+
         if ( ctrlIsPressed(keyboard, BUTTON_RIGHT) and not movement_time_counter )
         {
             vel.x = 1.f;
@@ -268,6 +295,10 @@ int main([[maybe_unused]] int argc, char* argv[])
         }
     }
 
+    if ( controller )
+    {
+        SDL_GameControllerClose(controller);
+    }
     SDL_DestroyWindow(window);
     SDL_GL_DeleteContext(gl_context);
     SDL_Quit();

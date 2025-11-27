@@ -1,7 +1,5 @@
 #include "control.hpp"
 
-#include <SDL2/SDL.h>
-
 static constexpr SDL_Scancode KEYBOARD_MAP[BUTTON_COUNT] = {
   SDL_SCANCODE_UP,
   SDL_SCANCODE_DOWN,
@@ -12,30 +10,65 @@ static constexpr SDL_Scancode KEYBOARD_MAP[BUTTON_COUNT] = {
   SDL_SCANCODE_A,
   SDL_SCANCODE_S,
   SDL_SCANCODE_RETURN,
-  SDL_SCANCODE_C};
+  SDL_SCANCODE_RSHIFT};
 
-void ctrlUpdate(Keyboard& keyboard)
+static constexpr SDL_GameControllerButton GAMECONTROLLER_MAP[BUTTON_COUNT] = {
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_UP,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_DOWN,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_LEFT,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_A,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_B,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_X,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_Y,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_START,
+  SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_BACK,
+};
+
+void ctrlUpdate(GamepadState& state)
 {
     const Uint8* sdl_state = SDL_GetKeyboardState(nullptr);
 
     for ( int idx = 0; idx < BUTTON_COUNT; idx++ )
     {
-        keyboard.state_prev[idx] = keyboard.state_curr[idx];
-        keyboard.state_curr[idx] = sdl_state[KEYBOARD_MAP[idx]];
+        state.previous[idx] = state.current[idx];
+        state.current[idx] = sdl_state[KEYBOARD_MAP[idx]];
     }
 }
 
-bool ctrlIsDown(const Keyboard& keyboard, Button button)
+void ctrlUpdate(GamepadState& state, SDL_GameController* controller)
 {
-    return keyboard.state_curr[button];
+    for ( int idx = 0; idx < BUTTON_COUNT; idx++ )
+    {
+        state.previous[idx] = state.current[idx];
+        state.current[idx] = SDL_GameControllerGetButton(controller, GAMECONTROLLER_MAP[idx]);
+    }
 }
 
-bool ctrlIsReleased(const Keyboard& keyboard, Button button)
+bool ctrlIsDown(const GamepadState& state, Button button)
 {
-    return not keyboard.state_curr[button] and keyboard.state_prev[button];
+    return state.current[button];
 }
 
-bool ctrlIsPressed(const Keyboard& keyboard, Button button)
+bool ctrlIsReleased(const GamepadState& state, Button button)
 {
-    return keyboard.state_curr[button] and not keyboard.state_prev[button];
+    return not state.current[button] and state.previous[button];
 }
+
+bool ctrlIsPressed(const GamepadState& state, Button button)
+{
+    return state.current[button] and not state.previous[button];
+}
+
+SDL_GameController* ctrlFindController()
+{
+    for ( int i = 0; i < SDL_NumJoysticks(); i++ )
+    {
+        if ( SDL_IsGameController(i) )
+        {
+            return SDL_GameControllerOpen(i);
+        }
+    }
+    return nullptr;
+}
+

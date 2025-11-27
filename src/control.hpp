@@ -1,5 +1,7 @@
 #pragma once
 
+#include <SDL2/SDL.h>
+
 enum Button
 {
     BUTTON_UP,
@@ -15,13 +17,15 @@ enum Button
     BUTTON_COUNT
 };
 
-struct Keyboard
+struct GamepadState
 {
-    bool state_curr[BUTTON_COUNT];
-    bool state_prev[BUTTON_COUNT];
+    bool current[BUTTON_COUNT];
+    bool previous[BUTTON_COUNT];
 };
 
-void ctrlUpdate(Keyboard& keyboard);
-bool ctrlIsDown(const Keyboard& keyboard, Button button);
-bool ctrlIsReleased(const Keyboard& keyboard, Button button);
-bool ctrlIsPressed(const Keyboard& keyboard, Button button);
+void                ctrlUpdate(GamepadState& state);                                 // Updates with the keyboard
+void                ctrlUpdate(GamepadState& state, SDL_GameController* controller); // Updates with a controller
+bool                ctrlIsDown(const GamepadState& state, Button button);
+bool                ctrlIsReleased(const GamepadState& state, Button button);
+bool                ctrlIsPressed(const GamepadState& state, Button button);
+SDL_GameController* ctrlFindController();
