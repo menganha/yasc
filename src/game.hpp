@@ -30,11 +30,11 @@ const IVec2 RES_SUPER_NINTENDO {256, 224};
 const IVec2 RES_SUPER_NINTENDO_DOUBLE {512, 488}; // less used
 const int   MAX_ENTITIES = 128;
 
-const float TILE_SIZE = 16.f;
-const float PIXEL_ADJ = 0.1f; // Needed for the correct texel interpolation
+const float     TILE_SIZE = 16.f;
+const float     PIXEL_ADJ = 0.1f; // Needed for the correct texel interpolation
 constexpr IVec2 LEVEL_DIM {16, 14};
-const int   MAX_LEVELS = 50;  // Amount of horizontal x vertical blocks
-const Vec4  QUAD[8] = {
+const int       MAX_LEVELS = 50;  // Amount of horizontal x vertical blocks
+const Vec4      QUAD[8] = {
   // Defines a quad and the texture uv corrdinates for a particular tile size
   {      0.f,       0.f,       0.f + PIXEL_ADJ,       0.f + PIXEL_ADJ},
   {TILE_SIZE,      0.0f, TILE_SIZE - PIXEL_ADJ,       0.f + PIXEL_ADJ},
@@ -80,7 +80,8 @@ struct Registry
 
 using EntityID = int;
 
-const EntityID ENT_INVALID {0};
+const EntityID ENT_INVALID_ID {0};
+const Entity   ENT_INVALID {};
 EntityID       regNewEntity(Registry& registry);
 void           regRepositionEntity(Registry& registry, EntityID id, float pos_x, float pos_y);
 void           regMoveEntity(Registry& registry, EntityID id, float delta_x, float delta_y);

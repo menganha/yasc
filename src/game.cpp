@@ -1,9 +1,10 @@
 #include "game.hpp"
 
-#include "log.hpp"
 #include "levels.hpp"
+#include "log.hpp"
 
 #include <SDL2/SDL.h>
+#include <cstring>
 
 static void addToBuffer(Renderable& renderable, Vec4* offsets, int num_instances)
 {
@@ -41,23 +42,22 @@ void CleanUp(Registry& registry)
 {
     for ( int idx = 0; idx < registry.num_entities; idx++ )
     {
-        Renderable& renderable = regGetEntity(registry, idx).renderable;
-        if ( renderable.VAO )
+        Entity& entity = regGetEntity(registry, idx);
+        if ( entity.renderable.VAO )
         {
-            glDeleteVertexArrays(1, &renderable.VAO);
-            renderable.VAO = 0;
+            glDeleteVertexArrays(1, &entity.renderable.VAO);
         }
-        if ( renderable.VBO )
+        if ( entity.renderable.VBO )
         {
-            glDeleteBuffers(1, &renderable.VBO);
-            renderable.VBO = 0;
+            glDeleteBuffers(1, &entity.renderable.VBO);
         }
-        if ( renderable.VBO_instance )
+        if ( entity.renderable.VBO_instance )
         {
-            glDeleteBuffers(1, &renderable.VBO_instance);
-            renderable.VBO_instance = 0;
+            glDeleteBuffers(1, &entity.renderable.VBO_instance);
         }
     }
+    // NOTE: Seems it is dangerous to do this :(
+    std::memset(&registry.entities, 0, MAX_ENTITIES * sizeof(Entity)); // Resets to zero the entire array
     registry.num_entities = 0;
 }
 
@@ -141,7 +141,7 @@ EntityID LoadLevel(Registry& registry, const int level)
 
     int      texture_width = 320; // TODO: Get them from reading the texture
     int      res_width = 256;     // TODO: Get them from reading the global settings
-    EntityID player_ent_id {ENT_INVALID};
+    EntityID player_ent_id {ENT_INVALID_ID};
 
     int* level_one_dim = (int*)(LEVELS[level]);
     int  num_static_tiles = 0;
@@ -153,7 +153,7 @@ EntityID LoadLevel(Registry& registry, const int level)
         float    position_y = ((idx * (int)TILE_SIZE) / res_width) * TILE_SIZE;            // NOLINT: We explicitly want integer division
         float    tile_offset_x = (tile_id * (int)TILE_SIZE) % texture_width;
         float    tile_offset_y = ((tile_id * (int)TILE_SIZE) / texture_width) * TILE_SIZE; // NOLINT: We explicitly want integer division
-        EntityID ent_id {ENT_INVALID};
+        EntityID ent_id {ENT_INVALID_ID};
         float    layer = 0.0;
 
         if ( level_one_dim[idx] == TT_PLAYER )
@@ -269,7 +269,7 @@ EntityID HasCollided(Registry& registry, EntityID player_ent_id)
             return idx;
         }
     }
-    return ENT_INVALID;
+    return ENT_INVALID_ID;
 }
 
 bool HasWon(Registry& registry)
