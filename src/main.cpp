@@ -2,7 +2,6 @@
 #include "control.hpp"
 #include "file_io.hpp"
 #include "game.hpp"
-#include "levels.hpp"
 #include "log.hpp"
 #include "shaders.hpp"
 
@@ -105,6 +104,7 @@ int main([[maybe_unused]] int argc, char* argv[])
         glUniformMatrix4fv(mat_loc_proj, 1, GL_TRUE, &proje_mat[0][0]);
     }
 
+    LoadLevelData(arena);
     GamepadState        keyboard {};
     Vec2                vel {};
     int                 movement_time_counter {};
@@ -141,6 +141,11 @@ int main([[maybe_unused]] int argc, char* argv[])
                 case SDLK_F2: // Advance
                     CleanUp(registry);
                     current_level++;
+                    ent_id_player = LoadLevel(registry, current_level);
+                    break;
+                case SDLK_F3: // Start from the beggining
+                    CleanUp(registry);
+                    current_level=0;
                     ent_id_player = LoadLevel(registry, current_level);
                     break;
                 }
@@ -201,7 +206,7 @@ int main([[maybe_unused]] int argc, char* argv[])
             movement_time_counter = movement_time;
         }
 
-        if ( movement_time_counter )
+        if ( movement_time_counter ) // is moving
         {
             Entity& ent_player = regGetEntity(registry, ent_id_player);
             regMoveEntity(registry, ent_id_player, vel.x * TILE_SIZE / movement_time, vel.y * TILE_SIZE / movement_time);

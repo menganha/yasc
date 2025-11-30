@@ -1,5 +1,7 @@
 #pragma once
 
+#include "arena.hpp"
+
 #include <glad/gl.h>
 
 struct Vec2
@@ -42,6 +44,7 @@ const Vec4      QUAD[8] = {
   {     0.0f, TILE_SIZE,       0.f + PIXEL_ADJ, TILE_SIZE - PIXEL_ADJ},
 };
 
+
 const float MODEL_MAT_ID[4][4] {
   {1.f, 0.f, 0.f, 0.f},
   {0.f, 1.f, 0.f, 0.f},
@@ -55,10 +58,10 @@ enum TileType
     TT_BOX = -2,
     TT_PRICE = -3,
     TT_EMPTY = -20,
-    TT_WALL1 = 0,
-    TT_WALL2 = 1,
-    TT_WALL3 = 2,
-    TT_WALL4 = 3,
+    TT_WALL = 0,
+    TT_WALL_TRANS = 1,
+    TT_WALL_CORNER = 2,
+    TT_WALL_TRANS_END = 3,
 };
 
 struct Entity
@@ -87,9 +90,11 @@ void           regRepositionEntity(Registry& registry, EntityID id, float pos_x,
 void           regMoveEntity(Registry& registry, EntityID id, float delta_x, float delta_y);
 Entity&        regGetEntity(Registry& registry, EntityID id);
 
+void     LoadLevelData(Arena& arena);
 EntityID LoadLevel(Registry& registry, int level);
 void     Draw(GLuint program, Renderable& renderable);
 EntityID HasCollided(Registry& registry, EntityID player_ent_id);
+EntityID HasCollidedWithBlock(Registry& registry, EntityID player_ent_id);
 bool     HasWon(Registry& registry);
 void     CleanUp(Registry& registry);
 

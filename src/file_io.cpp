@@ -41,3 +41,49 @@ int fileWrite(char* file_path, unsigned char* buffer, int count)
     fclose(file_handle);
     return (int)written;
 }
+
+inline int strIsSpace(char const* str)
+{
+    return '\0' < *str && *str <= ' ';
+}
+
+char* strFindFirstNonEmpty(char const* str)
+{
+    while ( strIsSpace(str) )
+    {
+        str++;
+    }
+    return (char*)str;
+}
+
+char* strStripWhitespaceRight(const char* str, char* str_end)
+{
+    str_end--;
+    while ( str_end > str && strIsSpace(str_end) )
+    {
+        *str_end = '\0';
+        str_end--;
+    }
+    return (char*)str;
+}
+
+bool strCompare(const char* str_1, const char* str_2)
+{
+    while ( *str_1 && (*str_1 == *str_2) )
+    {
+        str_1++;
+        str_2++;
+    }
+    return *str_1 == *str_2;
+}
+
+char* strFindCharOrCommentChar(char const* str, char schar, char comment_char)
+{
+    int was_whitespace = 0;
+    while ( *str && *str != schar && !(was_whitespace && *str == comment_char) )
+    {
+        was_whitespace = strIsSpace(str);
+        str++;
+    }
+    return (char*)str;
+}

@@ -1,10 +1,135 @@
 #include "game.hpp"
 
-#include "levels.hpp"
+#include "file_io.hpp"
 #include "log.hpp"
 
 #include <SDL2/SDL.h>
+#include <cstdio>
 #include <cstring>
+
+struct LevelData
+{
+    char level_name[128];
+    int  tiles[LEVEL_DIM.y][LEVEL_DIM.x];
+};
+
+static struct
+{
+    LevelData data[MAX_LEVELS];
+    int       num_levels;
+} g_levels;
+
+void LoadLevelData(Arena& arena)
+{
+    arena.set_mark();
+    char* file_str = fileRead("assets/levels", arena);
+    char* line = std::strtok(file_str, "\n");
+
+    bool parsing_level = false;
+    bool parsing_data = false;
+    char comment_char = '#';
+    int  tile_counter = 0;
+
+    LDEBUG("Parsing file assets/levels");
+    while ( line )
+    {
+        char* ptr_start;
+        char* ptr_end;
+        ptr_start = strFindFirstNonEmpty(line);
+        if ( not parsing_level )
+        {
+            if ( *ptr_start == '[' )
+            {
+                ptr_end = strFindCharOrCommentChar(ptr_start + 1, ']', comment_char);
+                if ( *ptr_end == ']' )
+                {
+                    std::size_t count = ptr_end - ptr_start - 1;
+                    std::strncpy(g_levels.data[g_levels.num_levels].level_name, ptr_start + 1, count);
+                    g_levels.data[g_levels.num_levels].level_name[count] = '\0';
+                    parsing_level = true;
+                    LDEBUG("Parsing now level: %s", g_levels.data[g_levels.num_levels].level_name);
+                }
+            }
+        }
+        else
+        {
+            if ( not parsing_data )
+            {
+                ptr_end = strFindCharOrCommentChar(ptr_start + 1, '=', comment_char);
+                if ( *ptr_end == '=' )
+                {
+                    *ptr_end = '\0'; // separate the key and the value
+                    char* key;
+                    char* value;
+                    key = strStripWhitespaceRight(ptr_start, ptr_end);
+                    value = strFindFirstNonEmpty(ptr_end + 1);
+
+                    ptr_end = strFindCharOrCommentChar(ptr_end + 1, '\0', comment_char);
+                    if ( *ptr_end == comment_char )
+                    {
+                        *ptr_end = '\0';
+                    }
+                    value = strStripWhitespaceRight(value, ptr_end);
+                    LDEBUG("Parsing key-value property: %s : %s ", key, value);
+
+                    if ( strCompare(key, "level") )
+                    {
+                        parsing_data = true;
+                    }
+                }
+            }
+            else
+            {
+                LDEBUG("Processing line %s", line);
+                while ( *line )
+                {
+                    int tile_idx_x = tile_counter % LEVEL_DIM.x;
+                    int tile_idx_y = tile_counter / LEVEL_DIM.x;
+                    LASSERT(tile_idx_x < LEVEL_DIM.x, "Number of horizontal tiles is larger than the dimension %s", line);
+                    LASSERT(tile_idx_y < LEVEL_DIM.y, "Number of vertical tiles is larger than the dimensions: %s", line);
+                    if ( *line == '-' )
+                    {
+                        g_levels.data[g_levels.num_levels].tiles[tile_idx_y][tile_idx_x] = TT_EMPTY;
+                        tile_counter++;
+                    }
+                    else if ( *line == '1' )
+                    {
+                        g_levels.data[g_levels.num_levels].tiles[tile_idx_y][tile_idx_x] = TT_WALL;
+                        tile_counter++;
+                    }
+                    else if ( *line == 'E' )
+                    {
+                        g_levels.data[g_levels.num_levels].tiles[tile_idx_y][tile_idx_x] = TT_PLAYER;
+                        tile_counter++;
+                    }
+                    else if ( *line == 'B' )
+                    {
+                        g_levels.data[g_levels.num_levels].tiles[tile_idx_y][tile_idx_x] = TT_BOX;
+                        tile_counter++;
+                    }
+                    else if ( *line == 'O' )
+                    {
+                        g_levels.data[g_levels.num_levels].tiles[tile_idx_y][tile_idx_x] = TT_PRICE;
+                        tile_counter++;
+                    }
+                    line++;
+                    if ( tile_counter == LEVEL_DIM.x * LEVEL_DIM.y )
+                    {
+                        parsing_data = false;
+                        parsing_level = false;
+                        tile_counter = 0;
+                        g_levels.num_levels++;
+                        break;
+                    }
+                }
+            }
+        }
+
+        line = std::strtok(nullptr, "\n");
+    }
+
+    arena.reset_to_mark();
+}
 
 static void addToBuffer(Renderable& renderable, Vec4* offsets, int num_instances)
 {
@@ -56,7 +181,6 @@ void CleanUp(Registry& registry)
             glDeleteBuffers(1, &entity.renderable.VBO_instance);
         }
     }
-    // NOTE: Seems it is dangerous to do this :(
     std::memset(&registry.entities, 0, MAX_ENTITIES * sizeof(Entity)); // Resets to zero the entire array
     registry.num_entities = 0;
 }
@@ -134,16 +258,23 @@ static bool IsLevelValid(const int level[LEVEL_DIM.y][LEVEL_DIM.x])
     return true;
 }
 
-EntityID LoadLevel(Registry& registry, const int level)
+EntityID LoadLevel(Registry& registry, int level)
 {
 
-    LASSERT(IsLevelValid(LEVELS[level]), "Level is not valid");
+    LASSERT(g_levels.num_levels, "No level data found");
+    if ( level >= g_levels.num_levels )
+    {
+        LERROR("Trying to asses non-existing level %i. There are only %i available levels", level + 1, g_levels.num_levels);
+        level = g_levels.num_levels - 1;
+    }
+
+    LASSERT(IsLevelValid(g_levels.data[level].tiles), "Level is not valid");
 
     int      texture_width = 320; // TODO: Get them from reading the texture
     int      res_width = 256;     // TODO: Get them from reading the global settings
     EntityID player_ent_id {ENT_INVALID_ID};
 
-    int* level_one_dim = (int*)(LEVELS[level]);
+    int* level_one_dim = (int*)(g_levels.data[level].tiles);
     int  num_static_tiles = 0;
     Vec4 offsets[LEVEL_DIM.x * LEVEL_DIM.y] {};
     for ( int idx = 0; idx < LEVEL_DIM.x * LEVEL_DIM.y; idx++ )
@@ -195,6 +326,9 @@ EntityID LoadLevel(Registry& registry, const int level)
             offsets[num_static_tiles].z = tile_offset_x;
             offsets[num_static_tiles].w = tile_offset_y;
             num_static_tiles++;
+
+            Entity& entity = regGetEntity(registry, ent_id);
+            entity.movable = false;
         }
 
         if ( ent_id ) // Sets the position of all entities
@@ -260,6 +394,27 @@ EntityID HasCollided(Registry& registry, EntityID player_ent_id)
     {
         const Entity& ent = regGetEntity(registry, idx);
         if ( ent.size.x == 0 or idx == player_ent_id )
+        {
+            continue;
+        }
+        SDL_Rect collider {(int)ent.pos.x, (int)ent.pos.y, ent.size.x, ent.size.y};
+        if ( SDL_HasIntersection(&collider, &collider_player) )
+        {
+            return idx;
+        }
+    }
+    return ENT_INVALID_ID;
+}
+
+EntityID HasCollidedWithBlock(Registry& registry, EntityID player_ent_id)
+{
+
+    Entity&  player_ent = regGetEntity(registry, player_ent_id);
+    SDL_Rect collider_player = {(int)player_ent.pos.x, (int)player_ent.pos.y, player_ent.size.x, player_ent.size.y};
+    for ( int idx = 0; idx < registry.num_entities; idx++ )
+    {
+        const Entity& ent = regGetEntity(registry, idx);
+        if ( ent.size.x == 0 or idx == player_ent_id or not ent.movable or not ent.price )
         {
             continue;
         }
