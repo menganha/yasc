@@ -216,10 +216,10 @@ int main([[maybe_unused]] int argc, char* argv[])
                   std::round(ent_player.pos_prev.x + vel.x * TILE_SIZE),
                   std::round(ent_player.pos_prev.y + vel.y * TILE_SIZE));
 
-                if ( EntityID ent_id_coll = HasCollided(registry, ent_id_player) )
+                if ( EntityID ent_id_coll = HasCollided(registry, ent_id_player, ENT_FLAG_GOAL) )
                 {
                     Entity& entity_collided = regGetEntity(registry, ent_id_coll);
-                    if ( entity_collided.movable )
+                    if ( entity_collided.flags & ENT_FLAG_BOX )
                     {
                         regRepositionEntity(
                           registry, ent_id_coll,
@@ -229,9 +229,9 @@ int main([[maybe_unused]] int argc, char* argv[])
                         if ( EntityID ent_id_coll_coll = HasCollided(registry, ent_id_coll) )
                         {
                             Entity& ent_coll_coll = regGetEntity(registry, ent_id_coll_coll);
-                            if ( ent_coll_coll.price ) // We collide a price with a movable block
+                            if ( ent_coll_coll.flags & ENT_FLAG_GOAL ) // We collide a price with a movable block
                             {
-                                entity_collided.occupied = true;
+                                entity_collided.flags |= ENT_FLAG_OCCUPIED;
                                 if ( HasWon(registry) )
                                 {
                                     has_won = true;
@@ -240,25 +240,25 @@ int main([[maybe_unused]] int argc, char* argv[])
                         }
                         else
                         {
-                            entity_collided.occupied = false;
+                            entity_collided.flags &= ~ENT_FLAG_OCCUPIED;
                         }
                     }
                 }
             }
-            else if ( HasCollidedWithBlock(registry, ent_id_player) ) // General collision
+            else if ( HasCollided(registry, ent_id_player, ENT_FLAG_GOAL | ENT_FLAG_BOX) ) // General collision
             {
                 regRepositionEntity(registry, ent_id_player, ent_player.pos_prev.x, ent_player.pos_prev.y);
                 movement_time_counter = 0;
             }
-            else if ( EntityID ent_id_coll = HasCollidedWithBox(registry, ent_id_player) ) // Collision with non Blockables
+            else if ( EntityID ent_id_coll = HasCollided(registry, ent_id_player, ENT_FLAG_GOAL) ) // Collision with boxes
             {
                 Entity& entity_collided = regGetEntity(registry, ent_id_coll);
                 // If we have collided with a movable box we move it with player, and if in this movement it collides
                 // with a non-price block then we revert the two positions, namely, the player and the movable box
                 regMoveEntity(registry, ent_id_coll, vel.x * TILE_SIZE / movement_time, vel.y * TILE_SIZE / movement_time);
-                if ( EntityID ent_id_coll_coll = HasCollided(registry, ent_id_coll) )
+                if ( EntityID ent_id_coll_coll = HasCollided(registry, ent_id_coll, ENT_FLAG_GOAL) )
                 {
-                    if ( not regGetEntity(registry, ent_id_coll_coll).price )
+                    if ( ~regGetEntity(registry, ent_id_coll_coll).flags & ENT_FLAG_GOAL )
                     {
                         regRepositionEntity(registry, ent_id_coll, entity_collided.pos_prev.x, entity_collided.pos_prev.y);
                         regRepositionEntity(registry, ent_id_player, ent_player.pos_prev.x, ent_player.pos_prev.y);

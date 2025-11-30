@@ -56,7 +56,7 @@ enum TileType
 {
     TT_PLAYER = -1,
     TT_BOX = -2,
-    TT_PRICE = -3,
+    TT_GOAL = -3,
     TT_EMPTY = -20,
     TT_WALL = 0,
     TT_WALL_TRANS = 1,
@@ -70,9 +70,13 @@ struct Entity
     Vec2       pos_prev; // previous frame position
     IVec2      size;
     Renderable renderable;
-    bool       movable; // TODO: move these booleans to bit flags
-    bool       price;
-    bool       occupied;
+    int        flags;
+};
+
+enum EntityFlags{
+    ENT_FLAG_BOX = 1,
+    ENT_FLAG_GOAL = 2,
+    ENT_FLAG_OCCUPIED = 4
 };
 
 struct Registry
@@ -93,9 +97,7 @@ Entity&        regGetEntity(Registry& registry, EntityID id);
 void     LoadLevelData(Arena& arena);
 EntityID LoadLevel(Registry& registry, int level);
 void     Draw(GLuint program, Renderable& renderable);
-EntityID HasCollided(Registry& registry, EntityID player_ent_id);  // TODO: Do it the DRY way 
-EntityID HasCollidedWithBlock(Registry& registry, EntityID player_ent_id);
-EntityID HasCollidedWithBox(Registry& registry, EntityID player_ent_id);
+EntityID HasCollided(Registry& registry, EntityID player_ent_id, int bitmask = 0);  
 bool     HasWon(Registry& registry);
 void     CleanUp(Registry& registry);
 
