@@ -128,6 +128,80 @@ void LoadLevelData(Arena& arena)
         line = std::strtok(nullptr, "\n");
     }
 
+    // Corrects the type of walls. Kind of a mess but it just works =)
+    // TODO: Better algorthim. Get reference to four directions and apply the logic there. It is much much
+    // simpler
+    for ( int level = 0; level < g_levels.num_levels; level++ )
+    {
+        for ( int idx_y = 0; idx_y < LEVEL_DIM.y; idx_y++ )
+        {
+            for ( int idx_x = 0; idx_x < LEVEL_DIM.x; idx_x++ )
+            {
+                if ( g_levels.data[level].tiles[idx_y][idx_x] == TT_WALL )
+                {
+                    int north = g_levels.data[level].tiles[idx_y-1][idx_x];
+                    int south = g_levels.data[level].tiles[idx_y+1][idx_x];
+                    int west = g_levels.data[level].tiles[idx_y][idx_x - 1];
+                    int east = g_levels.data[level].tiles[idx_y][idx_x - 1];
+
+                    if ( idx_x && (g_levels.data[level].tiles[idx_y][idx_x - 1] < TT_WALL) )
+                    {
+                        if ( g_levels.data[level].tiles[idx_y][idx_x + 1] >= TT_WALL )
+                        {
+                            if ( g_levels.data[level].tiles[idx_y + 1][idx_x] >= TT_WALL )
+                            {
+                                g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_TRANS_END;
+                            }
+                            else
+                            {
+                                g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_CORNER;
+                            }
+                        }
+                        else if ( g_levels.data[level].tiles[idx_y][idx_x + 1] < TT_WALL )
+                        {
+                            if ( g_levels.data[level].tiles[idx_y + 1][idx_x] >= TT_WALL )
+                            {
+                                g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_TRANS;
+                            }
+                            else
+                            {
+                                g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_CORNER;
+                            }
+                        }
+                    }
+                    else if ( idx_x && (g_levels.data[level].tiles[idx_y][idx_x - 1] >= TT_WALL) )
+                    {
+                        if ( g_levels.data[level].tiles[idx_y][idx_x + 1] < TT_WALL )
+                        {
+                            if ( g_levels.data[level].tiles[idx_y + 1][idx_x] >= TT_WALL )
+                            {
+                                g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_TRANS_END;
+                            }
+                            else
+                            {
+                                g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_CORNER;
+                            }
+                        }
+                        else
+                        {
+                            if ( g_levels.data[level].tiles[idx_y + 1][idx_x] >= TT_WALL )
+                            {
+                                g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_TRANS_END;
+                            }
+                        }
+                    }
+                    // else if ( idx_x && (g_levels.data[level].tiles[idx_y][idx_x - 1] == TT_WALL_CORNER) )
+                    // {
+                    //     if ( g_levels.data[level].tiles[idx_y + 1][idx_x] >= TT_WALL )
+                    //     {
+                    //         g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_TRANS_END;
+                    //     }
+                    // }
+                }
+            }
+        }
+    }
+
     arena.reset_to_mark();
 }
 
@@ -406,6 +480,27 @@ EntityID HasCollided(Registry& registry, EntityID player_ent_id)
     return ENT_INVALID_ID;
 }
 
+EntityID HasCollidedWithBox(Registry& registry, EntityID player_ent_id)
+{
+
+    Entity&  player_ent = regGetEntity(registry, player_ent_id);
+    SDL_Rect collider_player = {(int)player_ent.pos.x, (int)player_ent.pos.y, player_ent.size.x, player_ent.size.y};
+    for ( int idx = 0; idx < registry.num_entities; idx++ )
+    {
+        const Entity& ent = regGetEntity(registry, idx);
+        if ( ent.size.x == 0 or idx == player_ent_id or not ent.movable )
+        {
+            continue;
+        }
+        SDL_Rect collider {(int)ent.pos.x, (int)ent.pos.y, ent.size.x, ent.size.y};
+        if ( SDL_HasIntersection(&collider, &collider_player) )
+        {
+            return idx;
+        }
+    }
+    return ENT_INVALID_ID;
+}
+
 EntityID HasCollidedWithBlock(Registry& registry, EntityID player_ent_id)
 {
 
@@ -414,7 +509,7 @@ EntityID HasCollidedWithBlock(Registry& registry, EntityID player_ent_id)
     for ( int idx = 0; idx < registry.num_entities; idx++ )
     {
         const Entity& ent = regGetEntity(registry, idx);
-        if ( ent.size.x == 0 or idx == player_ent_id or not ent.movable or not ent.price )
+        if ( ent.size.x == 0 or idx == player_ent_id or ent.movable or ent.price )
         {
             continue;
         }

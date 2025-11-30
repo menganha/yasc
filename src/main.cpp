@@ -145,7 +145,7 @@ int main([[maybe_unused]] int argc, char* argv[])
                     break;
                 case SDLK_F3: // Start from the beggining
                     CleanUp(registry);
-                    current_level=0;
+                    current_level = 0;
                     ent_id_player = LoadLevel(registry, current_level);
                     break;
                 }
@@ -177,9 +177,6 @@ int main([[maybe_unused]] int argc, char* argv[])
         {
             ctrlUpdate(keyboard);
         }
-
-        if ( ctrlIsPressed(keyboard, BUTTON_SELECT) )
-            LINFO("SELECT BUTTON PRESSED");
 
         if ( ctrlIsPressed(keyboard, BUTTON_RIGHT) and not movement_time_counter )
         {
@@ -248,29 +245,25 @@ int main([[maybe_unused]] int argc, char* argv[])
                     }
                 }
             }
-            else if ( EntityID ent_id_coll = HasCollided(registry, ent_id_player) ) // Collision
+            else if ( HasCollidedWithBlock(registry, ent_id_player) ) // General collision
+            {
+                regRepositionEntity(registry, ent_id_player, ent_player.pos_prev.x, ent_player.pos_prev.y);
+                movement_time_counter = 0;
+            }
+            else if ( EntityID ent_id_coll = HasCollidedWithBox(registry, ent_id_player) ) // Collision with non Blockables
             {
                 Entity& entity_collided = regGetEntity(registry, ent_id_coll);
                 // If we have collided with a movable box we move it with player, and if in this movement it collides
                 // with a non-price block then we revert the two positions, namely, the player and the movable box
-                if ( entity_collided.movable )
+                regMoveEntity(registry, ent_id_coll, vel.x * TILE_SIZE / movement_time, vel.y * TILE_SIZE / movement_time);
+                if ( EntityID ent_id_coll_coll = HasCollided(registry, ent_id_coll) )
                 {
-                    regMoveEntity(registry, ent_id_coll, vel.x * TILE_SIZE / movement_time, vel.y * TILE_SIZE / movement_time);
-                    if ( EntityID ent_id_coll_coll = HasCollided(registry, ent_id_coll) )
+                    if ( not regGetEntity(registry, ent_id_coll_coll).price )
                     {
-                        if ( not regGetEntity(registry, ent_id_coll_coll).price )
-                        {
-                            regRepositionEntity(registry, ent_id_coll, entity_collided.pos_prev.x, entity_collided.pos_prev.y);
-                            regRepositionEntity(registry, ent_id_player, ent_player.pos_prev.x, ent_player.pos_prev.y);
-                            movement_time_counter = 0;
-                        }
+                        regRepositionEntity(registry, ent_id_coll, entity_collided.pos_prev.x, entity_collided.pos_prev.y);
+                        regRepositionEntity(registry, ent_id_player, ent_player.pos_prev.x, ent_player.pos_prev.y);
+                        movement_time_counter = 0;
                     }
-                }
-                // If the collision is not with a movable nor a price, then just revert the position
-                else if ( not entity_collided.price )
-                {
-                    regRepositionEntity(registry, ent_id_player, ent_player.pos_prev.x, ent_player.pos_prev.y);
-                    movement_time_counter = 0;
                 }
             }
         }

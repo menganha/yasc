@@ -93,8 +93,9 @@ Entity&        regGetEntity(Registry& registry, EntityID id);
 void     LoadLevelData(Arena& arena);
 EntityID LoadLevel(Registry& registry, int level);
 void     Draw(GLuint program, Renderable& renderable);
-EntityID HasCollided(Registry& registry, EntityID player_ent_id);
+EntityID HasCollided(Registry& registry, EntityID player_ent_id);  // TODO: Do it the DRY way 
 EntityID HasCollidedWithBlock(Registry& registry, EntityID player_ent_id);
+EntityID HasCollidedWithBox(Registry& registry, EntityID player_ent_id);
 bool     HasWon(Registry& registry);
 void     CleanUp(Registry& registry);
 
