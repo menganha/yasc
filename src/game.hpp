@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arena.hpp"
+#include "font.hpp"
 
 #include <glad/gl.h>
 
@@ -32,18 +33,18 @@ const IVec2 RES_SUPER_NINTENDO {256, 224};
 const IVec2 RES_SUPER_NINTENDO_DOUBLE {512, 488}; // less used
 const int   MAX_ENTITIES = 128;
 
+const int       MAX_CHARS_PER_STRING = 128;
 const float     TILE_SIZE = 16.f;
 const float     PIXEL_ADJ = 0.1f; // Needed for the correct texel interpolation
 constexpr IVec2 LEVEL_DIM {16, 14};
 const int       MAX_LEVELS = 50;  // Amount of horizontal x vertical blocks
-const Vec4      QUAD[8] = {
-  // Defines a quad and the texture uv corrdinates for a particular tile size
-  {      0.f,       0.f,       0.f + PIXEL_ADJ,       0.f + PIXEL_ADJ},
-  {TILE_SIZE,      0.0f, TILE_SIZE - PIXEL_ADJ,       0.f + PIXEL_ADJ},
-  {TILE_SIZE, TILE_SIZE, TILE_SIZE - PIXEL_ADJ, TILE_SIZE - PIXEL_ADJ},
-  {     0.0f, TILE_SIZE,       0.f + PIXEL_ADJ, TILE_SIZE - PIXEL_ADJ},
+const Vec4      QUAD[4] =         // Defines a quad and the texture uv corrdinates for a particular tile size
+  {
+    {      0.f,       0.f,       0.f + PIXEL_ADJ,       0.f + PIXEL_ADJ},
+    {TILE_SIZE,      0.0f, TILE_SIZE - PIXEL_ADJ,       0.f + PIXEL_ADJ},
+    {TILE_SIZE, TILE_SIZE, TILE_SIZE - PIXEL_ADJ, TILE_SIZE - PIXEL_ADJ},
+    {     0.0f, TILE_SIZE,       0.f + PIXEL_ADJ, TILE_SIZE - PIXEL_ADJ}
 };
-
 
 const float MODEL_MAT_ID[4][4] {
   {1.f, 0.f, 0.f, 0.f},
@@ -66,17 +67,20 @@ enum TileType
 
 struct Entity
 {
-    Vec2       pos;
-    Vec2       pos_prev; // previous frame position
-    IVec2      size;
-    Renderable renderable;
-    int        flags;
+    Vec2        pos;
+    Vec2        pos_prev; // previous frame position
+    IVec2       size;
+    Renderable  renderable;
+    const char* text;
+    int         flags;
 };
 
-enum EntityFlags{
+enum EntityFlags
+{
     ENT_FLAG_BOX = 1,
     ENT_FLAG_GOAL = 2,
-    ENT_FLAG_OCCUPIED = 4
+    ENT_FLAG_OCCUPIED = 4,
+    ENT_FLAG_TEXT = 8
 };
 
 struct Registry
@@ -95,9 +99,8 @@ void           regMoveEntity(Registry& registry, EntityID id, float delta_x, flo
 Entity&        regGetEntity(Registry& registry, EntityID id);
 
 void     LoadLevelData(Arena& arena);
-EntityID LoadLevel(Registry& registry, int level);
+EntityID LoadLevel(Registry& registry, FontData& font_data, int level);
 void     Draw(GLuint program, Renderable& renderable);
-EntityID HasCollided(Registry& registry, EntityID player_ent_id, int bitmask = 0);  
+EntityID HasCollided(Registry& registry, EntityID player_ent_id, int bitmask = 0);
 bool     HasWon(Registry& registry);
 void     CleanUp(Registry& registry);
-

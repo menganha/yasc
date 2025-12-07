@@ -150,7 +150,7 @@ void LoadLevelData(Arena& arena)
                     {
                         g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_TRANS;
                     }
-                    else if ( (n && !s && w && !e) || (n && !s && !w && e) || (n && !s && !w && !e) )
+                    else if ( (n && !s && w && !e) || (n && !s && !w && e) || (n && !s && !w && !e) || (n && !s && w && e) )
                     {
                         g_levels.data[level].tiles[idx_y][idx_x] = TT_WALL_CORNER;
                     }
@@ -166,13 +166,13 @@ void LoadLevelData(Arena& arena)
     arena.reset_to_mark();
 }
 
-static void addToBuffer(Renderable& renderable, Vec4* offsets, int num_instances)
+static void addToBuffer(Renderable& renderable, const Vec4* quad, const Vec4* offsets, int num_instances)
 {
 
     // Generate buffers
     glGenBuffers(1, &renderable.VBO);
     glBindBuffer(GL_ARRAY_BUFFER, renderable.VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * 4, &QUAD[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vec4) * 4, quad, GL_STATIC_DRAW);
 
     glGenBuffers(1, &renderable.VBO_instance);
     glBindBuffer(GL_ARRAY_BUFFER, renderable.VBO_instance);
@@ -196,6 +196,113 @@ static void addToBuffer(Renderable& renderable, Vec4* offsets, int num_instances
     // unbind VBO and VAOS
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+}
+
+static void FontAddText(const char* text, int pos_y, FontData& font_data, Registry& registry)
+{
+
+    Vec4  char_quads[4 * MAX_CHARS_PER_STRING] {};
+    Vec4* ptr_start = &char_quads[0];
+    Vec4  quad_offset {};
+
+    int pos_x {};
+    while ( *text )
+    {
+        // Check if the charecter glyph is in the font atlas.
+        if ( *text >= FIRST_CHAR && *text <= FIRST_CHAR + NUMBER_OF_CHARS )
+        {
+            // Retrive the data that is used to render a glyph of charecter 'ch'
+            stbtt_packedchar*   char_packed = &font_data.packed_chars[*text - FIRST_CHAR];
+            stbtt_aligned_quad* char_aligned = &font_data.aligned_quads[*text - FIRST_CHAR];
+            int                 size_x = char_packed->x1 - char_packed->x0;
+            int                 size_y = char_packed->y1 - char_packed->y0;
+
+            Vec4 quad[4] = {
+
+              {         (float)(pos_x + char_packed->xoff),          (float)(pos_y + char_packed->yoff), char_aligned->s0, char_aligned->t0},
+              {(float)(pos_x + char_packed->xoff + size_x),          (float)(pos_y + char_packed->yoff), char_aligned->s1, char_aligned->t0},
+              {(float)(pos_x + char_packed->xoff + size_x), (float)(pos_y + char_packed->yoff + size_y), char_aligned->s1, char_aligned->t1},
+              {         (float)(pos_x + char_packed->xoff), (float)(pos_y + char_packed->yoff + size_y), char_aligned->s0, char_aligned->t1}
+            };
+
+            std::memcpy(ptr_start, &quad, 4 * sizeof(Vec4));
+            ptr_start = ptr_start + 4;
+
+            pos_x += char_packed->xadvance;
+            EntityID ent_id = regNewEntity(registry);
+            Entity&  entity = regGetEntity(registry, ent_id);
+
+            addToBuffer(entity.renderable, &quad[0], &quad_offset, 1);
+
+            entity.flags = ENT_FLAG_TEXT;
+
+            // set initial position
+            entity.renderable.model_mat[0][0] = 1.f;
+            entity.renderable.model_mat[1][1] = 1.f;
+            entity.renderable.model_mat[2][2] = 1.f;
+            entity.renderable.model_mat[3][3] = 1.f;
+            entity.renderable.model_mat[0][3] = 3.f; 
+            entity.renderable.model_mat[1][3] = pos_y;
+            entity.renderable.model_mat[2][3] = -0.5f;
+            entity.renderable.num_instances = 1;
+            entity.pos.x = 0.f;
+            entity.pos.y = 0.f;
+        }
+        text++;
+    };
+}
+
+void Draw(GLuint program, Renderable& renderable)
+{
+    if ( renderable.VAO == 0 ) // There's no renderable component
+    {
+        return;
+    }
+    GLint mat_model = glGetUniformLocation(program, "model");
+    glUniformMatrix4fv(mat_model, 1, GL_TRUE, &renderable.model_mat[0][0]);
+    glBindVertexArray(renderable.VAO);
+    glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, renderable.num_instances);
+}
+
+EntityID HasCollided(Registry& registry, EntityID player_ent_id, int bitmask)
+{
+    // The bitmask work to mask-"OUT", i.e., ignore, the elements that match such mask
+    Entity&  player_ent = regGetEntity(registry, player_ent_id);
+    SDL_Rect collider_player = {(int)player_ent.pos.x, (int)player_ent.pos.y, player_ent.size.x, player_ent.size.y};
+    for ( int idx = 0; idx < registry.num_entities; idx++ )
+    {
+        const Entity& ent = regGetEntity(registry, idx);
+        if ( ent.size.x == 0 or idx == player_ent_id or ent.flags & bitmask )
+        {
+            continue;
+        }
+        SDL_Rect collider {(int)ent.pos.x, (int)ent.pos.y, ent.size.x, ent.size.y};
+        if ( SDL_HasIntersection(&collider, &collider_player) )
+        {
+            return idx;
+        }
+    }
+    return ENT_INVALID_ID;
+}
+
+bool HasWon(Registry& registry)
+{
+
+    int num_occupied = 0;
+    int num_prices = 0;
+    for ( int idx = 0; idx < registry.num_entities; idx++ )
+    {
+        const Entity& entity = regGetEntity(registry, idx);
+        if ( entity.flags & ENT_FLAG_GOAL )
+        {
+            num_prices++;
+        }
+        else if ( entity.flags & ENT_FLAG_OCCUPIED )
+        {
+            num_occupied++;
+        }
+    }
+    return num_prices == num_occupied;
 }
 
 void CleanUp(Registry& registry)
@@ -293,7 +400,7 @@ static bool IsLevelValid(const int level[LEVEL_DIM.y][LEVEL_DIM.x])
     return true;
 }
 
-EntityID LoadLevel(Registry& registry, int level)
+EntityID LoadLevel(Registry& registry, FontData& font_data, int level)
 {
 
     LASSERT(g_levels.num_levels, "No level data found");
@@ -328,7 +435,7 @@ EntityID LoadLevel(Registry& registry, int level)
             player_ent_id = ent_id;
             Entity& entity = regGetEntity(registry, ent_id);
             Vec4    quad_offset {0.f, 0.f, 128.f, 0.f};
-            addToBuffer(entity.renderable, &quad_offset, 1);
+            addToBuffer(entity.renderable, &QUAD[0], &quad_offset, 1);
             entity.renderable.num_instances = 1;
             layer = -0.2;
         }
@@ -337,7 +444,7 @@ EntityID LoadLevel(Registry& registry, int level)
             ent_id = regNewEntity(registry);
             Entity& entity = regGetEntity(registry, ent_id);
             Vec4    quad_offset {0.f, 0.f, 112.f, 128.f};
-            addToBuffer(entity.renderable, &quad_offset, 1);
+            addToBuffer(entity.renderable, &QUAD[0], &quad_offset, 1);
             entity.renderable.num_instances = 1;
             entity.flags |= ENT_FLAG_BOX;
             layer = -0.2;
@@ -347,7 +454,7 @@ EntityID LoadLevel(Registry& registry, int level)
             ent_id = regNewEntity(registry);
             Entity& entity = regGetEntity(registry, ent_id);
             Vec4    quad_offset {0.f, 0.f, 80.f, 128.f};
-            addToBuffer(entity.renderable, &quad_offset, 1);
+            addToBuffer(entity.renderable, &QUAD[0], &quad_offset, 1);
             entity.renderable.num_instances = 1;
             entity.flags |= ENT_FLAG_GOAL;
             layer = -0.1;
@@ -355,6 +462,7 @@ EntityID LoadLevel(Registry& registry, int level)
         else if ( tile_id >= 0 ) // BACKGROUND TILES
         {
             // Generates a single entity at the end containing all background tiles
+            // Additionally it generates bounding boxes entities as impenetrable blocks
             ent_id = regNewEntity(registry);
             offsets[num_static_tiles].x = position_x;
             offsets[num_static_tiles].y = position_y;
@@ -390,7 +498,7 @@ EntityID LoadLevel(Registry& registry, int level)
     EntityID ent_id = regNewEntity(registry);
     Entity&  entity = regGetEntity(registry, ent_id);
 
-    addToBuffer(entity.renderable, offsets, num_static_tiles);
+    addToBuffer(entity.renderable, &QUAD[0], offsets, num_static_tiles);
     entity.renderable.num_instances = num_static_tiles;
 
     // set initial position
@@ -401,60 +509,13 @@ EntityID LoadLevel(Registry& registry, int level)
     entity.pos.x = 0.f;
     entity.pos.y = 0.f;
 
+    char level_number_string_buffer[64];
+    std::sprintf(level_number_string_buffer, "Level %i", level + 1);
+
+    FontAddText(level_number_string_buffer, 5, font_data, registry);
+    FontAddText(g_levels.data[level].level_name, 11, font_data, registry);
+
     LASSERT(player_ent_id, "No player position was specified in the map");
     return player_ent_id;
 };
-
-void Draw(GLuint program, Renderable& renderable)
-{
-    if ( renderable.VAO == 0 ) // There's no renderable component
-    {
-        return;
-    }
-    GLint mat_model = glGetUniformLocation(program, "model");
-    glUniformMatrix4fv(mat_model, 1, GL_TRUE, &renderable.model_mat[0][0]);
-    glBindVertexArray(renderable.VAO);
-    glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, renderable.num_instances);
-}
-
-EntityID HasCollided(Registry& registry, EntityID player_ent_id, int bitmask)
-{
-    // The bitmask work to mask-"OUT", i.e., ignore, the elements that match such mask
-    Entity&  player_ent = regGetEntity(registry, player_ent_id);
-    SDL_Rect collider_player = {(int)player_ent.pos.x, (int)player_ent.pos.y, player_ent.size.x, player_ent.size.y};
-    for ( int idx = 0; idx < registry.num_entities; idx++ )
-    {
-        const Entity& ent = regGetEntity(registry, idx);
-        if ( ent.size.x == 0 or idx == player_ent_id or ent.flags & bitmask )
-        {
-            continue;
-        }
-        SDL_Rect collider {(int)ent.pos.x, (int)ent.pos.y, ent.size.x, ent.size.y};
-        if ( SDL_HasIntersection(&collider, &collider_player) )
-        {
-            return idx;
-        }
-    }
-    return ENT_INVALID_ID;
-}
-
-bool HasWon(Registry& registry)
-{
-
-    int num_occupied = 0;
-    int num_prices = 0;
-    for ( int idx = 0; idx < registry.num_entities; idx++ )
-    {
-        const Entity& entity = regGetEntity(registry, idx);
-        if ( entity.flags & ENT_FLAG_GOAL )
-        {
-            num_prices++;
-        }
-        else if ( entity.flags & ENT_FLAG_OCCUPIED )
-        {
-            num_occupied++;
-        }
-    }
-    return num_prices == num_occupied;
-}
 

@@ -1,6 +1,18 @@
-# This is a comment Line
-[a new start]  # this is an inline comment
-key = value  # One can potential define other properties for each level. Not yet supported
+# Levels are set as follows.
+# Grid should be 16 x 14 tiles in dimension. Each "Tile" should contain a single character separated by spaces.
+# The supported characters are
+#   '-' is an empty cell
+#   '1' is a wall
+#   'B' is a movable box
+#   'E' is the player initial position
+#   '0' is a goal that should be covered by a box
+#
+# Besides the size of the grid, it is also ensure that there is at least one "player" tile and
+# that there's the same amount of goals and boxes
+#
+#
+[A brave new world]  # this is an inline comment
+key = value  # One can potential define other properties for each level. Not yet picked up
 level =  # Level would be the last property to process
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
@@ -18,7 +30,7 @@ level =  # Level would be the last property to process
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 
 
-[level 2]
+[Practice your moves]
 level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
@@ -35,7 +47,7 @@ level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 
-[level 3]
+[Three together]
 level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
@@ -52,7 +64,7 @@ level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 
-[level 3]
+[Order is important]
 level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
@@ -69,7 +81,7 @@ level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 
-[level 3]
+[Where to start?]
 level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
@@ -78,7 +90,7 @@ level =
 -  -  -  -  1  O  1  O  -  -  O  1  -  -  -  - 
 -  -  -  -  1  -  E  -  -  B  B  1  -  -  -  - 
 -  -  -  -  1  -  -  B  B  -  -  1  -  -  -  - 
--  -  -  -  1  -  1  -  -  -  -  1  -  -  -  - 
+-  -  -  -  1  -  1  1  -  -  -  1  -  -  -  - 
 -  -  -  -  1  O  1  1  1  -  -  1  -  -  -  - 
 -  -  -  -  1  1  1  -  1  1  1  1  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
@@ -86,19 +98,20 @@ level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 
-[level 3]
+[Keep on moving]
 level =
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 -  -  -  1  1  1  1  1  1  1  1  1  1  -  -  -
--  -  -  1  0  -  -  1  O  -  -  O  1  -  -  -
--  -  -  1  -  -  -  E  -  -  B  B  1  -  -  -
--  -  -  1  -  1  B  -  B  -  1  -  1  -  -  -
--  -  -  1  -  -  -  1  -  -  -  -  1  -  -  -
+-  -  -  1  O  -  -  1  O  -  -  O  1  -  -  -
+-  -  -  1  -  -  -  -  -  -  B  1  1  -  -  -
+-  -  -  1  -  1  B  -  B  -  B  -  1  -  -  -
+-  -  -  1  -  -  -  1  1  -  E  -  1  -  -  -
 -  -  -  1  O  -  -  1  1  1  -  -  1  -  -  -
 -  -  -  1  1  1  1  1  -  1  1  1  1  -  -  -
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+

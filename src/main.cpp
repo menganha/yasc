@@ -1,6 +1,7 @@
 #include "arena.hpp"
 #include "control.hpp"
 #include "file_io.hpp"
+#include "font.hpp"
 #include "game.hpp"
 #include "log.hpp"
 #include "shaders.hpp"
@@ -57,9 +58,40 @@ int main([[maybe_unused]] int argc, char* argv[])
         glUseProgram(shader.program_id);
     }
 
-    GLuint TEXTURE_ID;
+    FontData font_data {};
+    GLuint   TEXTURE_FONT_ID;
     {
-        int            width, height, nr_channels;
+        font_data.file_path = "assets/PressStart2P.ttf";
+        font_data.size = 8;
+        font_data.atlas_width = 512;
+        font_data.atlas_height = 512;
+        unsigned char* data = FontLoad(font_data, arena);
+
+        glGenTextures(1, &TEXTURE_FONT_ID);
+        glBindTexture(GL_TEXTURE_2D, TEXTURE_FONT_ID);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, font_data.atlas_width, font_data.atlas_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        // upload the uniform for scaling the texel vertices
+        float texture_scaling[2][2] {};
+        texture_scaling[0][0] = 1.f / font_data.atlas_width;
+        texture_scaling[1][1] = 1.f / font_data.atlas_height;
+
+        GLint mat_loc_proj = glGetUniformLocation(shader.program_id, "texture_scaling");
+        glUniformMatrix2fv(mat_loc_proj, 1, GL_TRUE, &texture_scaling[0][0]);
+    }
+
+    GLuint TEXTURE_ID;
+    int    width, height;
+    {
+        int            nr_channels;
         const char*    file = "assets/tiles.png";
         unsigned char* data = stbi_load(file, &width, &height, &nr_channels, 0);
 
@@ -75,9 +107,6 @@ int main([[maybe_unused]] int argc, char* argv[])
 
         glBindTexture(GL_TEXTURE_2D, 0);
         stbi_image_free(data);
-
-        GLint sprite_loc = glGetUniformLocation(shader.program_id, "sprite");
-        glUniform1i(sprite_loc, 0);
 
         // upload the uniform for scaling the texel vertices
         float texture_scaling[2][2] {};
@@ -112,7 +141,7 @@ int main([[maybe_unused]] int argc, char* argv[])
     bool                has_won {false};
     int                 current_level {};
     Registry            registry {};
-    EntityID            ent_id_player = LoadLevel(registry, current_level);
+    EntityID            ent_id_player = LoadLevel(registry, font_data, current_level);
     SDL_GameController* controller = ctrlFindController();
 
     glEnable(GL_BLEND);
@@ -136,17 +165,17 @@ int main([[maybe_unused]] int argc, char* argv[])
                 {
                 case SDLK_F1: // Restart
                     CleanUp(registry);
-                    ent_id_player = LoadLevel(registry, current_level);
+                    ent_id_player = LoadLevel(registry, font_data, current_level);
                     break;
                 case SDLK_F2: // Advance
                     CleanUp(registry);
                     current_level++;
-                    ent_id_player = LoadLevel(registry, current_level);
+                    ent_id_player = LoadLevel(registry, font_data, current_level);
                     break;
                 case SDLK_F3: // Start from the beggining
                     CleanUp(registry);
                     current_level = 0;
-                    ent_id_player = LoadLevel(registry, current_level);
+                    ent_id_player = LoadLevel(registry, font_data, current_level);
                     break;
                 }
                 break;
@@ -268,17 +297,36 @@ int main([[maybe_unused]] int argc, char* argv[])
             }
         }
 
-        ///  Draw
-
-        glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+        ///  Draw section
+        glClearColor(0.85f, 0.85f, 0.85f, 1.0f);
         glClearDepth(0.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glBindTexture(GL_TEXTURE_2D, TEXTURE_ID);
         glUseProgram(shader.program_id);
 
         for ( auto& ent : registry.entities )
         {
+            if ( ent.flags & ENT_FLAG_TEXT )
+            {
+                glBindTexture(GL_TEXTURE_2D, TEXTURE_FONT_ID);
+
+                float texture_scaling[2][2] {};
+                texture_scaling[0][0] = 1.f; /// font_data.atlas_width;
+                texture_scaling[1][1] = 1.f; /// font_data.atlas_height;
+                GLint mat_loc_proj = glGetUniformLocation(shader.program_id, "texture_scaling");
+                glUniformMatrix2fv(mat_loc_proj, 1, GL_TRUE, &texture_scaling[0][0]);
+            }
+            else
+            {
+                glBindTexture(GL_TEXTURE_2D, TEXTURE_ID);
+
+                float texture_scaling[2][2] {};
+                texture_scaling[0][0] = 1.f / width;
+                texture_scaling[1][1] = 1.f / height;
+
+                GLint mat_loc_proj = glGetUniformLocation(shader.program_id, "texture_scaling");
+                glUniformMatrix2fv(mat_loc_proj, 1, GL_TRUE, &texture_scaling[0][0]);
+            }
             Draw(shader.program_id, ent.renderable);
         }
         SDL_GL_SwapWindow(window);
@@ -289,7 +337,7 @@ int main([[maybe_unused]] int argc, char* argv[])
             CleanUp(registry);
             current_level++;
             has_won = false;
-            ent_id_player = LoadLevel(registry, current_level);
+            ent_id_player = LoadLevel(registry, font_data, current_level);
         }
     }
 
