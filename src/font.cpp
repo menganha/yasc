@@ -35,13 +35,15 @@ unsigned char* FontLoad(FontData& font_data, Arena& arena)
       1,                      // Padding between the glyphs
       nullptr);
 
+    // stbtt_PackSetOversampling(&ctx, 2, 2); //       for improved quality on small fonts
+
     // Creates character bitmaps. Data for how to render them is stored on the packed_chars
     stbtt_PackFontRange(
       &ctx,                  // stbtt_pack_context
       file_buffer,           // Font Atlas texture data
       0,                     // Font Index
       font_data.size,        // Size of font in pixels. (Use STBTT_POINT_SIZE(fontSize) to use points)
-      FIRST_CHAR, // Code point of the first charecter
+      FIRST_CHAR,            // Code point of the first charecter
       NUMBER_OF_CHARS,       // No. of charecters to be included in the font atlas
       font_data.packed_chars // stbtt_packedchar array, this struct will contain the data to render a glyph
     );

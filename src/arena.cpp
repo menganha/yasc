@@ -13,13 +13,13 @@ void Arena::reset() { m_offset = 0; }
 
 void Arena::set_mark()
 {
-    LASSERT(m_mark == -1, "Mark has been already set at %i, %p", m_mark, m_buffer + m_mark)
+    LASSERT(m_mark == -1, "Mark has been already set at %i, %p", m_mark, m_buffer + m_mark);
     m_mark = m_offset;
 }
 
 void Arena::reset_to_mark()
 {
-    LASSERT(m_mark != -1, "Mark has not been set")
+    LASSERT(m_mark != -1, "Mark has not been set");
     m_offset = m_mark;
     m_mark = -1;
 }

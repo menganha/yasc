@@ -79,8 +79,9 @@ enum EntityFlags
 {
     ENT_FLAG_BOX = 1,
     ENT_FLAG_GOAL = 2,
-    ENT_FLAG_OCCUPIED = 4,
-    ENT_FLAG_TEXT = 8
+    ENT_FLAG_OCCUPIED = 4, // when box entity is on top of a goal
+    ENT_FLAG_TEXT = 8,
+    ENT_FLAG_PLAYER = 16
 };
 
 struct Registry

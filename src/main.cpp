@@ -20,6 +20,7 @@ const IVec2      WINDOW_SIZE {RESOLUTION.x * RES_SCALING, RESOLUTION.y* RES_SCAL
 int main([[maybe_unused]] int argc, char* argv[])
 {
 
+    set_level(Logger::LOG_INFO);
     if ( SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0 )
     {
         LERROR("SDL error when initializing: %s", SDL_GetError());
@@ -49,13 +50,15 @@ int main([[maybe_unused]] int argc, char* argv[])
 
     Arena  arena {MEGABYTES(1)};
     Shader shader;
+    Shader shader_effect;
     {
-
-        const char* vert_shader_str = fileRead("src/sprite.vert", arena);
-        const char* frag_shader_str = fileRead("src/sprite.frag", arena);
-        shaderInit(shader, vert_shader_str, frag_shader_str);
-
-        glUseProgram(shader.program_id);
+        arena.set_mark();
+        const char* shader_str_vert = fileRead("src/sprite.vert", arena);
+        const char* shader_str_frag = fileRead("src/sprite.frag", arena);
+        const char* shader_str_frag_effect = fileRead("src/sprite_effect.frag", arena);
+        shaderInit(shader, shader_str_vert, shader_str_frag);
+        shaderInit(shader_effect, shader_str_vert, shader_str_frag_effect);
+        arena.reset_to_mark();
     }
 
     FontData font_data {};
@@ -78,14 +81,6 @@ int main([[maybe_unused]] int argc, char* argv[])
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, font_data.atlas_width, font_data.atlas_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
 
         glBindTexture(GL_TEXTURE_2D, 0);
-
-        // upload the uniform for scaling the texel vertices
-        float texture_scaling[2][2] {};
-        texture_scaling[0][0] = 1.f / font_data.atlas_width;
-        texture_scaling[1][1] = 1.f / font_data.atlas_height;
-
-        GLint mat_loc_proj = glGetUniformLocation(shader.program_id, "texture_scaling");
-        glUniformMatrix2fv(mat_loc_proj, 1, GL_TRUE, &texture_scaling[0][0]);
     }
 
     GLuint TEXTURE_ID;
@@ -107,17 +102,9 @@ int main([[maybe_unused]] int argc, char* argv[])
 
         glBindTexture(GL_TEXTURE_2D, 0);
         stbi_image_free(data);
-
-        // upload the uniform for scaling the texel vertices
-        float texture_scaling[2][2] {};
-        texture_scaling[0][0] = 1.f / width;
-        texture_scaling[1][1] = 1.f / height;
-
-        GLint mat_loc_proj = glGetUniformLocation(shader.program_id, "texture_scaling");
-        glUniformMatrix2fv(mat_loc_proj, 1, GL_TRUE, &texture_scaling[0][0]);
     }
 
-    // Sets the projection matrix
+    // Sets the projection matrix to both shaders
     {
         float proje_mat[4][4] {};
         proje_mat[0][0] = 2.f / RESOLUTION.x;
@@ -129,7 +116,12 @@ int main([[maybe_unused]] int argc, char* argv[])
         proje_mat[1][3] = 1.f;
         proje_mat[2][3] = 0.f;
 
+        glUseProgram(shader.program_id);
         GLint mat_loc_proj = glGetUniformLocation(shader.program_id, "projection");
+        glUniformMatrix4fv(mat_loc_proj, 1, GL_TRUE, &proje_mat[0][0]);
+
+        glUseProgram(shader_effect.program_id);
+        mat_loc_proj = glGetUniformLocation(shader.program_id, "projection");
         glUniformMatrix4fv(mat_loc_proj, 1, GL_TRUE, &proje_mat[0][0]);
     }
 
@@ -151,8 +143,14 @@ int main([[maybe_unused]] int argc, char* argv[])
 
     SDL_Event event;
     bool      should_quit {false};
+    float       time {};
     while ( not should_quit )
     {
+
+        if ( time > 1e30f )
+            time = 0.f;
+        time+=0.017f;
+
         while ( SDL_PollEvent(&event) )
         {
             switch ( event.type )
@@ -165,6 +163,7 @@ int main([[maybe_unused]] int argc, char* argv[])
                 {
                 case SDLK_F1: // Restart
                     CleanUp(registry);
+                    LoadLevelData(arena);
                     ent_id_player = LoadLevel(registry, font_data, current_level);
                     break;
                 case SDLK_F2: // Advance
@@ -302,12 +301,12 @@ int main([[maybe_unused]] int argc, char* argv[])
         glClearDepth(0.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(shader.program_id);
-
+        // First pass
         for ( auto& ent : registry.entities )
         {
             if ( ent.flags & ENT_FLAG_TEXT )
             {
+                glUseProgram(shader.program_id);
                 glBindTexture(GL_TEXTURE_2D, TEXTURE_FONT_ID);
 
                 float texture_scaling[2][2] {};
@@ -315,20 +314,31 @@ int main([[maybe_unused]] int argc, char* argv[])
                 texture_scaling[1][1] = 1.f; /// font_data.atlas_height;
                 GLint mat_loc_proj = glGetUniformLocation(shader.program_id, "texture_scaling");
                 glUniformMatrix2fv(mat_loc_proj, 1, GL_TRUE, &texture_scaling[0][0]);
+                Draw(shader.program_id, ent.renderable);
             }
             else
             {
-                glBindTexture(GL_TEXTURE_2D, TEXTURE_ID);
 
                 float texture_scaling[2][2] {};
                 texture_scaling[0][0] = 1.f / width;
                 texture_scaling[1][1] = 1.f / height;
 
-                GLint mat_loc_proj = glGetUniformLocation(shader.program_id, "texture_scaling");
+                GLuint program_id = shader.program_id;
+                if ( ent.flags & ENT_FLAG_OCCUPIED )
+                {
+                    program_id = shader_effect.program_id;
+                }
+                glUseProgram(program_id);
+                glBindTexture(GL_TEXTURE_2D, TEXTURE_ID);
+                GLint time_var = glGetUniformLocation(program_id, "time");
+                glUniform1f(time_var, time);
+
+                GLint mat_loc_proj = glGetUniformLocation(program_id, "texture_scaling");
                 glUniformMatrix2fv(mat_loc_proj, 1, GL_TRUE, &texture_scaling[0][0]);
+                Draw(program_id, ent.renderable);
             }
-            Draw(shader.program_id, ent.renderable);
         }
+
         SDL_GL_SwapWindow(window);
 
         if ( has_won )

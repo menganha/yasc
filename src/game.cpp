@@ -21,6 +21,7 @@ static struct
 
 void LoadLevelData(Arena& arena)
 {
+    g_levels.num_levels = 0;
     arena.set_mark();
     char* file_str = fileRead("assets/levels", arena);
     char* line = std::strtok(file_str, "\n");
@@ -241,7 +242,7 @@ static void FontAddText(const char* text, int pos_y, FontData& font_data, Regist
             entity.renderable.model_mat[1][1] = 1.f;
             entity.renderable.model_mat[2][2] = 1.f;
             entity.renderable.model_mat[3][3] = 1.f;
-            entity.renderable.model_mat[0][3] = 3.f; 
+            entity.renderable.model_mat[0][3] = 3.f;
             entity.renderable.model_mat[1][3] = pos_y;
             entity.renderable.model_mat[2][3] = -0.5f;
             entity.renderable.num_instances = 1;
@@ -252,13 +253,15 @@ static void FontAddText(const char* text, int pos_y, FontData& font_data, Regist
     };
 }
 
-void Draw(GLuint program, Renderable& renderable)
+void Draw(GLuint program_id, Renderable& renderable)
 {
+
+    glUseProgram(program_id);
     if ( renderable.VAO == 0 ) // There's no renderable component
     {
         return;
     }
-    GLint mat_model = glGetUniformLocation(program, "model");
+    GLint mat_model = glGetUniformLocation(program_id, "model");
     glUniformMatrix4fv(mat_model, 1, GL_TRUE, &renderable.model_mat[0][0]);
     glBindVertexArray(renderable.VAO);
     glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, renderable.num_instances);
@@ -432,11 +435,11 @@ EntityID LoadLevel(Registry& registry, FontData& font_data, int level)
         if ( level_one_dim[idx] == TT_PLAYER )
         {
             ent_id = regNewEntity(registry);
-            player_ent_id = ent_id;
             Entity& entity = regGetEntity(registry, ent_id);
             Vec4    quad_offset {0.f, 0.f, 128.f, 0.f};
             addToBuffer(entity.renderable, &QUAD[0], &quad_offset, 1);
             entity.renderable.num_instances = 1;
+            entity.flags |= ENT_FLAG_PLAYER;
             layer = -0.2;
         }
         else if ( level_one_dim[idx] == TT_BOX )
@@ -508,6 +511,43 @@ EntityID LoadLevel(Registry& registry, FontData& font_data, int level)
     entity.renderable.model_mat[3][3] = 1.f;
     entity.pos.x = 0.f;
     entity.pos.y = 0.f;
+
+    // // Swap elements as we want the player to be drawn last to keep the transparency effects on
+    // Entity tmp = regGetEntity(registry, player_ent_id);
+    // regGetEntity(registry, player_ent_id) = regGetEntity(registry, registry.num_entities - 1);
+    // regGetEntity(registry, registry.num_entities - 1) = tmp;
+    // player_ent_id = registry.num_entities - 1;
+
+    // Put goals to the bottom
+    std::qsort(
+      &registry.entities[1],
+      registry.num_entities-1,
+      sizeof(Entity),
+      [](const void* x, const void* y) {
+          const Entity arg1 = *static_cast<const Entity*>(x);
+          const Entity arg2 = *static_cast<const Entity*>(y);
+          if ( (arg1.flags & ENT_FLAG_GOAL) and (arg2.flags & ENT_FLAG_GOAL) )
+          {
+              return 0;
+          }
+          else if ( arg1.flags & ENT_FLAG_GOAL )
+          {
+              return -1;
+          }
+          else if ( arg2.flags & ENT_FLAG_GOAL )
+          {
+              return 1;
+          }
+          return 0;
+      });
+
+    for ( EntityID id = 1; id < registry.num_entities; id++ )
+    {
+        if ( registry.entities[id].flags & ENT_FLAG_PLAYER )
+        {
+            player_ent_id = id;
+        }
+    }
 
     char level_number_string_buffer[64];
     std::sprintf(level_number_string_buffer, "Level %i", level + 1);
