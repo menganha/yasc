@@ -20,7 +20,7 @@ const IVec2      WINDOW_SIZE {RESOLUTION.x * RES_SCALING, RESOLUTION.y* RES_SCAL
 int main([[maybe_unused]] int argc, char* argv[])
 {
 
-    set_level(Logger::LOG_INFO);
+    // set_level(Logger::LOG_INFO);
     if ( SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0 )
     {
         LERROR("SDL error when initializing: %s", SDL_GetError());

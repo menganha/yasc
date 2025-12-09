@@ -58,6 +58,7 @@ enum TileType
     TT_PLAYER = -1,
     TT_BOX = -2,
     TT_GOAL = -3,
+    TT_OCCUPIED = -4,
     TT_EMPTY = -20,
     TT_WALL = 0,
     TT_WALL_TRANS = 1,

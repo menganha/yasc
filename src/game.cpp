@@ -113,6 +113,11 @@ void LoadLevelData(Arena& arena)
                         g_levels.data[g_levels.num_levels].tiles[tile_idx_y][tile_idx_x] = TT_GOAL;
                         tile_counter++;
                     }
+                    else if ( *line == 'G' )
+                    {
+                        g_levels.data[g_levels.num_levels].tiles[tile_idx_y][tile_idx_x] = TT_OCCUPIED;
+                        tile_counter++;
+                    }
                     line++;
                     if ( tile_counter == LEVEL_DIM.x * LEVEL_DIM.y )
                     {
@@ -389,6 +394,11 @@ static bool IsLevelValid(const int level[LEVEL_DIM.y][LEVEL_DIM.x])
         {
             n_prices++;
         }
+        else if ( tile_id == TT_OCCUPIED )
+        {
+            n_prices++;
+            n_boxes++;
+        }
     }
     if ( n_players != 1 )
     {
@@ -430,6 +440,7 @@ EntityID LoadLevel(Registry& registry, FontData& font_data, int level)
         float    tile_offset_x = (tile_id * (int)TILE_SIZE) % texture_width;
         float    tile_offset_y = ((tile_id * (int)TILE_SIZE) / texture_width) * TILE_SIZE; // NOLINT: We explicitly want integer division
         EntityID ent_id {ENT_INVALID_ID};
+        EntityID ent_id_2 {ENT_INVALID_ID};                                                // placeholder if on the same tile there are two
         float    layer = 0.0;
 
         if ( level_one_dim[idx] == TT_PLAYER )
@@ -452,7 +463,7 @@ EntityID LoadLevel(Registry& registry, FontData& font_data, int level)
             entity.flags |= ENT_FLAG_BOX;
             layer = -0.2;
         }
-        else if ( level_one_dim[idx] == TT_GOAL )
+        else if ( level_one_dim[idx] == TT_GOAL or level_one_dim[idx] == TT_OCCUPIED )
         {
             ent_id = regNewEntity(registry);
             Entity& entity = regGetEntity(registry, ent_id);
@@ -461,6 +472,34 @@ EntityID LoadLevel(Registry& registry, FontData& font_data, int level)
             entity.renderable.num_instances = 1;
             entity.flags |= ENT_FLAG_GOAL;
             layer = -0.1;
+
+            if ( level_one_dim[idx] == TT_OCCUPIED )
+            {
+                // Add box
+                ent_id_2 = regNewEntity(registry);
+                Entity& entity = regGetEntity(registry, ent_id_2);
+                Vec4    quad_offset {0.f, 0.f, 112.f, 128.f};
+                addToBuffer(entity.renderable, &QUAD[0], &quad_offset, 1);
+                entity.renderable.num_instances = 1;
+                entity.flags |= ENT_FLAG_BOX;
+                entity.flags |= ENT_FLAG_OCCUPIED;
+                entity.pos.x = position_x;
+                entity.pos.y = position_y;
+                entity.pos_prev.x = entity.pos.x;
+                entity.pos_prev.y = entity.pos.y;
+                entity.size.x = TILE_SIZE;
+                entity.size.y = TILE_SIZE;
+                if ( entity.renderable.VAO ) // If it has a renderable the set initial position of the transform matrix
+                {
+                    entity.renderable.model_mat[0][0] = 1.f;
+                    entity.renderable.model_mat[1][1] = 1.f;
+                    entity.renderable.model_mat[2][2] = 1.f;
+                    entity.renderable.model_mat[3][3] = 1.f;
+                    entity.renderable.model_mat[0][3] = entity.pos.x;
+                    entity.renderable.model_mat[1][3] = entity.pos.y;
+                    entity.renderable.model_mat[2][3] = -0.2;
+                }
+            }
         }
         else if ( tile_id >= 0 ) // BACKGROUND TILES
         {
@@ -512,16 +551,10 @@ EntityID LoadLevel(Registry& registry, FontData& font_data, int level)
     entity.pos.x = 0.f;
     entity.pos.y = 0.f;
 
-    // // Swap elements as we want the player to be drawn last to keep the transparency effects on
-    // Entity tmp = regGetEntity(registry, player_ent_id);
-    // regGetEntity(registry, player_ent_id) = regGetEntity(registry, registry.num_entities - 1);
-    // regGetEntity(registry, registry.num_entities - 1) = tmp;
-    // player_ent_id = registry.num_entities - 1;
-
-    // Put goals to the bottom
+    // Put goals to the bottom of the entity vector for getting that transparency effects
     std::qsort(
       &registry.entities[1],
-      registry.num_entities-1,
+      registry.num_entities - 1,
       sizeof(Entity),
       [](const void* x, const void* y) {
           const Entity arg1 = *static_cast<const Entity*>(x);
